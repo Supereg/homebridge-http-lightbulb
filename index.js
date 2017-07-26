@@ -179,7 +179,7 @@ HTTP_LIGHTBULB.prototype = {
         if (url)
             url = this.saturation.setUrl.replace("%s", saturation);
 
-        this._doRequest("setSaturation", this.saturation.httpMethod, "saturation.setUrl", callback, function (body) {
+        this._doRequest("setSaturation", url, this.saturation.httpMethod, "saturation.setUrl", callback, function (body) {
             that.log("saturation successfully set to %s", saturation);
 
             callback(undefined, body);
