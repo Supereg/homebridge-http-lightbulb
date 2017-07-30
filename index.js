@@ -188,7 +188,7 @@ HTTP_LIGHTBULB.prototype = {
 
     _doRequest: function (methodName, url, httpMethod, urlName, callback, successCallback) {
         if (!url) {
-            this.log.warn("Ignroing " + methodName + "() request, '" + urlName + "' is not defined!");
+            this.log.warn("Ignoring " + methodName + "() request, '" + urlName + "' is not defined!");
             callback(new Error("No '" + urlName + "' defined!"));
             return;
         }
