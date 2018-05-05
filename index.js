@@ -84,7 +84,15 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getServices: function () {
-        return [this.homebridgeService];
+        const informationService = new Service.AccessoryInformation();
+
+        informationService
+            .setCharacteristic(Characteristic.Manufacturer, "Andreas Bauer")
+            .setCharacteristic(Characteristic.Model, "HTTP Lightbulb")
+            .setCharacteristic(Characteristic.SerialNumber, "LB01")
+            .setCharacteristic(Characteristic.FirmwareRevision, "0.1.0");
+
+        return [informationService, this.homebridgeService];
     },
 
     getPowerState: function (callback) {
