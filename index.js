@@ -1,7 +1,7 @@
 "use strict";
 
-var Service, Characteristic;
-var request = require("request");
+let Service, Characteristic;
+const request = require("request");
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
@@ -88,10 +88,10 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getPowerState: function (callback) {
-        var that = this;
+        const that = this;
 
         this._doRequest("getPowerState", this.power.statusUrl, "GET", "power.statusUrl", callback, function (body) {
-            var powerOn = parseInt(body) > 0;
+            const powerOn = parseInt(body) > 0;
             that.log("power is currently %s", powerOn? "ON": "OFF");
 
             callback(null, powerOn);
@@ -99,10 +99,10 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setPowerState: function (on, callback) {
-        var that = this;
+        const that = this;
 
-        var url = on? this.power.onUrl: this.power.offUrl;
-        var urlName = on? "power.onUrl": "power.offUrl";
+        const url = on ? this.power.onUrl : this.power.offUrl;
+        const urlName = on ? "power.onUrl" : "power.offUrl";
 
         this._doRequest("setPowerState", url, this.power.httpMethod, urlName, callback, function (body) {
             that.log("power successfully set to %s", on? "ON": "OFF");
@@ -112,10 +112,10 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getBrightness: function (callback) {
-        var that = this;
+        const that = this;
 
         this._doRequest("getBrightness", this.brightness.statusUrl, "GET", "brightness.statusUrl", callback, function (body) {
-            var brightness = parseInt(body);
+            const brightness = parseInt(body);
             that.log("brightness is currently at %s %", brightness);
 
             callback(null, brightness);
@@ -123,9 +123,9 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setBrightness: function (brightness, callback) {
-        var that = this;
+        const that = this;
 
-        var url = this.brightness.setUrl;
+        let url = this.brightness.setUrl;
         if (url)
             url = this.brightness.setUrl.replace("%s", brightness);
 
@@ -137,10 +137,10 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getHue: function (callback) {
-        var that = this;
+        const that = this;
 
         this._doRequest("getHue", this.hue.statusUrl, "GET", "hue.statusUrl", callback, function (body) {
-            var hue = parseFloat(body);
+            const hue = parseFloat(body);
             that.log("hue is currently at %s", hue);
 
             callback(null, hue);
@@ -148,9 +148,9 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setHue: function (hue, callback) {
-        var that = this;
+        const that = this;
 
-        var url = this.hue.setUrl;
+        let url = this.hue.setUrl;
         if (url)
             url = this.hue.setUrl.replace("%s", hue);
 
@@ -162,10 +162,10 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getSaturation: function (callback) {
-        var that = this;
+        const that = this;
 
         this._doRequest("getSaturation", this.saturation.statusUrl, "GET", "saturation.statusUrl", callback, function (body) {
-            var saturation = parseFloat(body);
+            const saturation = parseFloat(body);
             that.log("saturation is currently at %s", saturation);
 
             callback(null, saturation);
@@ -173,9 +173,9 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setSaturation: function (saturation, callback) {
-        var that = this;
+        const that = this;
 
-        var url = this.saturation.setUrl;
+        let url = this.saturation.setUrl;
         if (url)
             url = this.saturation.setUrl.replace("%s", saturation);
 
@@ -193,7 +193,7 @@ HTTP_LIGHTBULB.prototype = {
             return;
         }
 
-        var that = this;
+        const that = this;
 
         request(
             {
