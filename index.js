@@ -2,6 +2,7 @@
 
 let Service, Characteristic;
 const request = require("request");
+const packageJSON = require("./package.json");
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
@@ -90,7 +91,7 @@ HTTP_LIGHTBULB.prototype = {
             .setCharacteristic(Characteristic.Manufacturer, "Andreas Bauer")
             .setCharacteristic(Characteristic.Model, "HTTP Lightbulb")
             .setCharacteristic(Characteristic.SerialNumber, "LB01")
-            .setCharacteristic(Characteristic.FirmwareRevision, "0.1.0");
+            .setCharacteristic(Characteristic.FirmwareRevision, packageJSON.version);
 
         return [informationService, this.homebridgeService];
     },
