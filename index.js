@@ -143,14 +143,12 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getPowerState: function (callback) {
-        const that = this;
-
         this._doRequest("getPowerState", this.power.statusUrl, "GET", "power.statusUrl", callback, function (body) {
             const powerOn = parseInt(body) > 0;
-            that.log("power is currently %s", powerOn? "ON": "OFF");
+            this.log("power is currently %s", powerOn? "ON": "OFF");
 
             callback(null, powerOn);
-        });
+        }.bind(this));
     },
 
     setPowerState: function (on, callback) {
@@ -159,27 +157,24 @@ HTTP_LIGHTBULB.prototype = {
             callback(undefined);
             return;
         }
-        const that = this;
 
         const url = on ? this.power.onUrl : this.power.offUrl;
         const urlName = on ? "power.onUrl" : "power.offUrl";
 
         this._doRequest("setPowerState", url, this.power.httpMethod, urlName, callback, function (body) {
-            that.log("power successfully set to %s", on? "ON": "OFF");
+            this.log("power successfully set to %s", on? "ON": "OFF");
 
             callback(undefined, body);
-        });
+        }.bind(this));
     },
 
     getBrightness: function (callback) {
-        const that = this;
-
         this._doRequest("getBrightness", this.brightness.statusUrl, "GET", "brightness.statusUrl", callback, function (body) {
             const brightness = parseInt(body);
-            that.log("brightness is currently at %s %", brightness);
+            this.log("brightness is currently at %s %", brightness);
 
             callback(null, brightness);
-        });
+        }.bind(this));
     },
 
     setBrightness: function (brightness, callback) {
@@ -188,28 +183,25 @@ HTTP_LIGHTBULB.prototype = {
             callback(undefined);
             return;
         }
-        const that = this;
 
         let url = this.brightness.setUrl;
         if (url)
             url = this.brightness.setUrl.replace("%s", brightness);
 
         this._doRequest("setBrightness", url, this.brightness.httpMethod, "brightness.setUrl", callback, function (body) {
-            that.log("brightness successfully set to %s %", brightness);
+            this.log("brightness successfully set to %s %", brightness);
 
             callback(undefined, body);
-        });
+        }.bind(this));
     },
 
     getHue: function (callback) {
-        const that = this;
-
         this._doRequest("getHue", this.hue.statusUrl, "GET", "hue.statusUrl", callback, function (body) {
             const hue = parseFloat(body);
-            that.log("hue is currently at %s", hue);
+            this.log("hue is currently at %s", hue);
 
             callback(null, hue);
-        });
+        }.bind(this));
     },
 
     setHue: function (hue, callback) {
@@ -218,28 +210,25 @@ HTTP_LIGHTBULB.prototype = {
             callback(undefined);
             return;
         }
-        const that = this;
 
         let url = this.hue.setUrl;
         if (url)
             url = this.hue.setUrl.replace("%s", hue);
 
         this._doRequest("setHue", url, this.hue.httpMethod, "hue.setUrl", callback, function (body) {
-            that.log("hue successfully set to %s", hue);
+            this.log("hue successfully set to %s", hue);
 
             callback(undefined, body);
-        })
+        }.bind(this));
     },
 
     getSaturation: function (callback) {
-        const that = this;
-
         this._doRequest("getSaturation", this.saturation.statusUrl, "GET", "saturation.statusUrl", callback, function (body) {
             const saturation = parseFloat(body);
-            that.log("saturation is currently at %s", saturation);
+            this.log("saturation is currently at %s", saturation);
 
             callback(null, saturation);
-        });
+        }.bind(this));
     },
 
     setSaturation: function (saturation, callback) {
@@ -248,17 +237,16 @@ HTTP_LIGHTBULB.prototype = {
             callback(undefined);
             return;
         }
-        const that = this;
 
         let url = this.saturation.setUrl;
         if (url)
             url = this.saturation.setUrl.replace("%s", saturation);
 
         this._doRequest("setSaturation", url, this.saturation.httpMethod, "saturation.setUrl", callback, function (body) {
-            that.log("saturation successfully set to %s", saturation);
+            this.log("saturation successfully set to %s", saturation);
 
             callback(undefined, body);
-        })
+        }.bind(this))
     },
 
     _doRequest: function (methodName, url, httpMethod, urlName, callback, successCallback) {
@@ -267,8 +255,6 @@ HTTP_LIGHTBULB.prototype = {
             callback(new Error("No '" + urlName + "' defined!"));
             return;
         }
-
-        const that = this;
 
         request(
             {
@@ -279,17 +265,17 @@ HTTP_LIGHTBULB.prototype = {
             },
             function (error, response, body) {
                 if (error) {
-                    that.log(methodName + "() failed: %s", error.message);
+                    this.log(methodName + "() failed: %s", error.message);
                     callback(error);
                 }
                 else if (response.statusCode !== 200) {
-                    that.log(methodName + "() returned http error: %s", response.statusCode);
+                    this.log(methodName + "() returned http error: %s", response.statusCode);
                     callback(new Error("Got http error code " + response.statusCode));
                 }
                 else {
                     successCallback(body);
                 }
-            }
+            }.bind(this)
         );
     }
 
