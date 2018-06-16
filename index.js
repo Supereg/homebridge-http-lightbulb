@@ -1,12 +1,14 @@
 "use strict";
 
-let Service, Characteristic;
+let Service, Characteristic, api;
 const request = require("request");
 const packageJSON = require("./package.json");
 
 module.exports = function (homebridge) {
     Service = homebridge.hap.Service;
     Characteristic = homebridge.hap.Characteristic;
+
+    api = homebridge;
 
     homebridge.registerAccessory("homebridge-http-lightbulb", "HTTP-LIGHTBULB", HTTP_LIGHTBULB);
 };
@@ -75,6 +77,22 @@ function HTTP_LIGHTBULB(log, config) {
         this.homebridgeService.addCharacteristic(Characteristic.Saturation)
             .on("get", this.getSaturation.bind(this))
             .on("set", this.setSaturation.bind(this));
+
+    this.notificationID = config.notificationID;
+    this.notificationPassword = config.notificationPassword;
+
+    if (this.notificationID) {
+        api.on("didFinishLaunching", function () {
+            if (api.notificationRegistration && typeof api.notificationRegistration === "function") {
+                try {
+                    api.notificationRegistration(this.notificationID, this.handleNotification.bind(this), this.notificationPassword);
+                    this.log("Detected running notification server. Registered successfully!");
+                } catch (error) {
+                    this.log("Could not register notification handler. ID '" + this.notificationID + "' is already taken!")
+                }
+            }
+        }.bind(this));
+    }
 }
 
 HTTP_LIGHTBULB.prototype = {
@@ -96,6 +114,34 @@ HTTP_LIGHTBULB.prototype = {
         return [informationService, this.homebridgeService];
     },
 
+    handleNotification: function (body) {
+        const value = body.value;
+
+        let characteristic;
+        switch (body.characteristic) {
+            case "On":
+                characteristic = Characteristic.On;
+                break;
+            case "Brightness":
+                characteristic = Characteristic.Brightness;
+                break;
+            case "Hue":
+                characteristic = Characteristic.Hue;
+                break;
+            case "Saturation":
+                characteristic = Characteristic.Saturation;
+                break;
+            default:
+                this.log("Encountered unknown characteristic handling notification: " + body.characteristic);
+                return;
+        }
+
+        this.log("Updating '" + body.characteristic + "' to new value: " + body.value);
+
+        this.ignoreNextSet = true;
+        this.homebridgeService.setCharacteristic(characteristic, value);
+    },
+
     getPowerState: function (callback) {
         const that = this;
 
@@ -108,6 +154,11 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setPowerState: function (on, callback) {
+        if (this.ignoreNextSet) {
+            this.ignoreNextSet = false;
+            callback(undefined);
+            return;
+        }
         const that = this;
 
         const url = on ? this.power.onUrl : this.power.offUrl;
@@ -132,6 +183,11 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setBrightness: function (brightness, callback) {
+        if (this.ignoreNextSet) {
+            this.ignoreNextSet = false;
+            callback(undefined);
+            return;
+        }
         const that = this;
 
         let url = this.brightness.setUrl;
@@ -157,6 +213,11 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setHue: function (hue, callback) {
+        if (this.ignoreNextSet) {
+            this.ignoreNextSet = false;
+            callback(undefined);
+            return;
+        }
         const that = this;
 
         let url = this.hue.setUrl;
@@ -182,6 +243,11 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setSaturation: function (saturation, callback) {
+        if (this.ignoreNextSet) {
+            this.ignoreNextSet = false;
+            callback(undefined);
+            return;
+        }
         const that = this;
 
         let url = this.saturation.setUrl;
