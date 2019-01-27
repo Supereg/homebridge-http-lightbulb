@@ -1,7 +1,14 @@
 "use strict";
 
 let Service, Characteristic, api;
-const request = require("request");
+
+const _http_base = require("homebridge-http-base");
+const http = _http_base.http;
+const configParser = _http_base.configParser;
+const PullTimer = _http_base.PullTimer;
+const notifications = _http_base.notifications;
+const MQTTClient = _http_base.MQTTClient;
+
 const packageJSON = require("./package.json");
 
 module.exports = function (homebridge) {
@@ -13,89 +20,404 @@ module.exports = function (homebridge) {
     homebridge.registerAccessory("homebridge-http-lightbulb", "HTTP-LIGHTBULB", HTTP_LIGHTBULB);
 };
 
+const BrightnessUnit = Object.freeze({
+    PERCENT: "percent",
+    RGB: "rgb",
+});
+
+const TemperatureUnit = Object.freeze({
+    MICRORECIPROCAL_DEGREE: "mired",
+    KELVIN: "kelvin",
+});
+
 function HTTP_LIGHTBULB(log, config) {
     this.log = log;
     this.name = config.name;
+    this.debug = config.debug || false;
 
-    this.power = {};
-    this.brightness = { enabled: false };
-    this.hue = { enabled: false };
-    this.saturation = { enabled: false };
-
-    if (typeof config.power === 'object') {
-        this.power.httpMethod = config.power.httpMethod || "GET";
-
-        this.power.onUrl = config.power.onUrl;
-        this.power.offUrl = config.power.offUrl;
-        this.power.statusUrl = config.power.statusUrl;
+    const success = this.parseCharacteristics(config);
+    if (!success) {
+        this.log.warn("Aborting...");
+        return;
     }
 
-    if (typeof config.brightness === 'object') {
-        this.brightness.enabled = true;
+    if (config.auth) {
+        if (!(config.auth.username && config.auth.password))
+            this.log("'auth.username' and/or 'auth.password' was not set!");
+        else {
+            const urlObjects = [this.power.onUrl, this.power.offUrl, this.power.statusUrl];
+            if (this.brightness)
+                urlObjects.push(this.brightness.setUrl, this.brightness.statusUrl);
+            if (this.hue)
+                urlObjects.push(this.hue.setUrl, this.hue.statusUrl);
+            if (this.saturation)
+                urlObjects.push(this.saturation.setUrl, this.saturation.statusUrl);
+            if (this.colorTemperature)
+                urlObjects.push(this.colorTemperature.setUrl, this.colorTemperature.statusUrl);
 
-        this.brightness.httpMethod = config.brightness.httpMethod || "GET";
+            urlObjects.forEach(value => {
+                value.auth.username = config.auth.username;
+                value.auth.password = config.auth.password;
 
-        this.brightness.setUrl = config.brightness.setUrl;
-        this.brightness.statusUrl = config.brightness.statusUrl;
-    }
-
-    if (typeof config.hue === 'object') {
-        this.hue.enabled = true;
-
-        this.hue.httpMethod = config.hue.httpMethod || "GET";
-
-        this.hue.setUrl = config.hue.setUrl;
-        this.hue.statusUrl = config.hue.statusUrl;
-    }
-
-    if (typeof config.saturation === 'object') {
-        this.saturation.enabled = true;
-
-        this.saturation.httpMethod = config.saturation.httpMethod || "GET";
-
-        this.saturation.setUrl = config.saturation.setUrl;
-        this.saturation.statusUrl = config.saturation.statusUrl;
+                if (typeof config.auth.sendImmediately === "boolean")
+                    value.auth.sendImmediately = config.auth.sendImmediately;
+            })
+        }
     }
 
     this.homebridgeService = new Service.Lightbulb(this.name);
-
     this.homebridgeService.getCharacteristic(Characteristic.On)
         .on("get", this.getPowerState.bind(this))
         .on("set", this.setPowerState.bind(this));
-
-    if (this.brightness.enabled)
+    if (this.brightness)
         this.homebridgeService.addCharacteristic(Characteristic.Brightness)
             .on("get", this.getBrightness.bind(this))
             .on("set", this.setBrightness.bind(this));
-
-    if (this.hue.enabled)
+    if (this.hue)
         this.homebridgeService.addCharacteristic(Characteristic.Hue)
             .on("get", this.getHue.bind(this))
             .on("set", this.setHue.bind(this));
-
-    if (this.saturation.enabled)
+    if (this.saturation)
         this.homebridgeService.addCharacteristic(Characteristic.Saturation)
             .on("get", this.getSaturation.bind(this))
             .on("set", this.setSaturation.bind(this));
+    if (this.colorTemperature)
+        this.homebridgeService.addCharacteristic(Characteristic.ColorTemperature)
+            .on("get", this.getColorTemperature.bind(this))
+            .on("set", this.setColorTemperature.bind(this))
+            .setProps({
+               minValue: this.colorTemperature.minValue,
+               maxValue: this.colorTemperature.maxValue
+            });
 
-    this.notificationID = config.notificationID;
-    this.notificationPassword = config.notificationPassword;
+    /** @namespace config.pullInterval */
+    if (config.pullInterval) {
+        // TODO what is with updating other characteristics. 'On' should be enough for now, since this is probably the characteristic
+        //  that matters the most and also get's changed the most.
+        this.pullTimer = new PullTimer(this.log, config.pullInterval, this.getPowerState.bind(this), value => {
+            this.homebridgeService.getCharacteristic(Characteristic.On).updateValue(value);
+        });
+        this.pullTimer.start();
+    }
 
-    if (this.notificationID) {
-        api.on("didFinishLaunching", function () {
-            if (api.notificationRegistration && typeof api.notificationRegistration === "function") {
-                try {
-                    api.notificationRegistration(this.notificationID, this.handleNotification.bind(this), this.notificationPassword);
-                    this.log("Detected running notification server. Registered successfully!");
-                } catch (error) {
-                    this.log("Could not register notification handler. ID '" + this.notificationID + "' is already taken!")
-                }
+    /** @namespace config.notificationID */
+    /** @namespace config.notificationPassword */
+    if (config.notificationID)
+        notifications.enqueueNotificationRegistrationIfDefined(api, log, config.notificationID, config.notificationPassword, this.handleNotification.bind(this));
+
+    /** @namespace config.mqtt */
+    if (config.mqtt) {
+        let options;
+        try {
+            options = configParser.parseMQTTOptions(config.mqtt);
+        } catch (error) {
+            this.log.error("Error occurred while parsing MQTT property: " + error.message);
+            this.log.error("MQTT will not be enabled!");
+        }
+
+        if (options) {
+            try {
+                this.mqttClient = new MQTTClient(this.homebridgeService, options, this.log);
+                this.mqttClient.connect();
+            } catch (error) {
+                this.log.error("Error occurred creating mqtt client: " + error.message);
             }
-        }.bind(this));
+        }
+    }
+
+    this.log("Lightbulb successfully configured...");
+    if (this.debug) {
+        this.log("Lightbulb started with the following options: ");
+        this.log("  - power: " + JSON.stringify(this.power));
+        if (this.brightness)
+            this.log("  - brightness: " + JSON.stringify(this.brightness));
+        if (this.hue)
+            this.log("  - hue: " + JSON.stringify(this.hue));
+        if (this.saturation)
+            this.log("  - saturation: " + JSON.stringify(this.saturation));
+        if (this.colorTemperature)
+            this.log("  - colorTemperature: " + JSON.stringify(this.colorTemperature));
+
+        if (this.auth)
+            this.log("  - auth options: " + JSON.stringify(this.auth));
+
+        if (this.pullTimer)
+            this.log("  - pullTimer started with interval " + config.pullInterval);
+
+        if (config.notificationID)
+            this.log("  - notificationID specified: " + config.notificationID);
+
+        if (this.mqttClient) {
+            const options = this.mqttClient.mqttOptions;
+            this.log(`  - mqtt client instantiated: ${options.protocol}://${options.host}:${options.port}`);
+            this.log("     -> subscribing to topics:");
+
+            for (const topic in this.mqttClient.subscriptions) {
+                if (!this.mqttClient.subscriptions.hasOwnProperty(topic))
+                    continue;
+
+                this.log(`         - ${topic}`);
+            }
+        }
     }
 }
 
 HTTP_LIGHTBULB.prototype = {
+
+    parseCharacteristics: function (config) {
+        this.power = {};
+
+        let url;
+        try {
+            url = "onUrl";
+            this.power.onUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
+            url = "offUrl";
+            this.power.offUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
+            url = "statusUrl";
+            this.power.statusUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
+        } catch (error) {
+            this.log.warn(`Error occurred while parsing '${url}': ${error.message}`);
+            return false;
+        }
+
+        this.power.statusPattern = /1/; // default pattern
+        try {
+            // statusPattern didn't exist in v0.1.1, no need for backwards compatibility lol
+            this.power.statusPattern = this.parsePattern(config.statusPattern);
+        } catch (error) {
+            this.log.warn("Property 'power.statusPattern' was given in an unsupported type. Using the default one!");
+        }
+
+        if (config.brightness) {
+            if (typeof config.brightness === "object") {
+                if (!config.brightness.setUrl || !config.brightness.statusUrl) {
+                    this.log.warn("Property 'brightness' was defined, however some urls are missing!");
+                    return false;
+                }
+
+                this.brightness = {};
+                let url;
+                try {
+                    // noinspection JSUnusedAssignment
+                    url = "setUrl";
+                    this.brightness.setUrl = configParser.parseUrlProperty(config.brightness.setUrl);
+                    url = "statusUrl";
+                    this.brightness.statusUrl = configParser.parseUrlProperty(config.brightness.statusUrl);
+                } catch (error) {
+                    this.log.warn(`Error occurred while parsing 'brightness.${url}': ${error.message}`);
+                    return false;
+                }
+
+                this.brightness.unit = this.valueOf(BrightnessUnit, config.brightness.unit, BrightnessUnit.PERCENT);
+                if (!this.brightness.unit) {
+                    this.log.warn(`${config.brightness.unit} is a unsupported brightness unit!`);
+                    return false;
+                }
+
+                this.brightness.statusPattern = /([0-9]{1,3})/; // default pattern
+                try {
+                    this.brightness.statusPattern = this.parsePattern(config.brightness.statusPattern);
+                } catch (error) {
+                    this.log.warn("Property 'brightness.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+
+
+                this.brightness.withholdPowerUpdate = config.brightness.withholdPowerUpdate || false;
+                this.withholdPowerCall = false;
+            }
+            else {
+                this.log.warn("Property 'brightness' needs to be an object!");
+                return false;
+            }
+        }
+
+        if (config.hue) {
+            if (typeof config.hue === "object") {
+                if (!config.hue.setUrl || !config.hue.statusUrl) {
+                    this.log.warn("Property 'hue' was defined, however some urls are missing!");
+                    return false;
+                }
+
+                this.hue = {};
+                let url;
+                try {
+                    // noinspection JSUnusedAssignment
+                    url = "setUrl";
+                    this.hue.setUrl = configParser.parseUrlProperty(config.hue.setUrl);
+                    url = "statusUrl";
+                    this.hue.statusUrl = configParser.parseUrlProperty(config.hue.statusUrl);
+                } catch (error) {
+                    this.log.warn(`Error occurred while parsing 'hue.${url}': ${error.message}`);
+                    return false;
+                }
+
+                this.hue.statusPattern = /([0-9]{1,3})/; // default pattern
+                try {
+                    this.hue.statusPattern = this.parsePattern(config.hue.statusPattern);
+                } catch (error) {
+                    this.log.warn("Property 'hue.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+            }
+            else {
+                this.log.warn("Property 'hue' needs to be an object!");
+                return false;
+            }
+        }
+        if (config.saturation) {
+            if (typeof config.saturation === "object") {
+                if (!config.saturation.setUrl || !config.saturation.statusUrl) {
+                    this.log.warn("Property 'saturation' was defined, however some urls are missing!");
+                    return false;
+                }
+
+                this.saturation = {};
+                let url;
+                try {
+                    // noinspection JSUnusedAssignment
+                    url = "setUrl";
+                    this.saturation.setUrl = configParser.parseUrlProperty(config.saturation.setUrl);
+                    url = "statusUrl";
+                    this.saturation.statusUrl = configParser.parseUrlProperty(config.saturation.statusUrl);
+                } catch (error) {
+                    this.log.warn(`Error occurred while parsing 'saturation.${url}': ${error.message}`);
+                    return false;
+                }
+
+                this.saturation.statusPattern = /([0-9]{1,3})/; // default pattern
+                try {
+                    this.saturation.statusPattern = this.parsePattern(config.saturation.statusPattern);
+                } catch (error) {
+                    this.log.warn("Property 'saturation.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+            }
+            else {
+                this.log.warn("Property 'saturation' needs to be an object!");
+                return false;
+            }
+        }
+
+        if (config.colorTemperature) {
+            if (typeof config.colorTemperature === "object") {
+                if (this.hue || this.saturation) {
+                    this.log.warn("When specifying 'colorTemperature' 'hue' and 'saturation' must not be specified!");
+                    return false;
+                }
+
+                if (!config.colorTemperature.setUrl || !config.colorTemperature.statusUrl) {
+                    this.log.warn("Property 'colorTemperature' was defined, however some urls are missing!");
+                    return false;
+                }
+
+                this.colorTemperature = {};
+                let url;
+                try {
+                    // noinspection JSUnusedAssignment
+                    url = "setUrl";
+                    this.colorTemperature.setUrl = configParser.parseUrlProperty(config.colorTemperature.setUrl);
+                    url = "statusUrl";
+                    this.colorTemperature.statusUrl = configParser.parseUrlProperty(config.colorTemperature.statusUrl);
+                } catch (error) {
+                    this.log.warn(`Error occurred while parsing 'colorTemperature.${url}': ${error.message}`);
+                    return false;
+                }
+
+                this.colorTemperature.unit = this.valueOf(TemperatureUnit, config.colorTemperature.unit, TemperatureUnit.MICRORECIPROCAL_DEGREE);
+                if (!this.colorTemperature.unit) {
+                    this.log.warn(`${config.colorTemperature.unit} is a unsupported temperature unit!`);
+                    return false;
+                }
+
+                this.colorTemperature.statusPattern = this.colorTemperature.unit === TemperatureUnit.MICRORECIPROCAL_DEGREE? /([0-9]{2,3})/: /([0-9]{4,5})/; // default pattern
+                try {
+                    this.colorTemperature.statusPattern = this.parsePattern(config.colorTemperature.statusPattern);
+                } catch (error) {
+                    this.log.warn("Property 'colorTemperature.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+
+                this.colorTemperature.minValue = 50; // HAP default values
+                this.colorTemperature.maxValue = 400;
+
+                if (config.colorTemperature.minValue) {
+                    if (typeof config.colorTemperature.minValue === "number") {
+                        let minValue = config.colorTemperature.minValue;
+
+                        if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
+                            minValue = Math.floor(1000000 / minValue);
+                        this.colorTemperature.minValue = minValue;
+                    }
+                    else
+                        this.log.warn("'colorTemperature.minValue' needs to be a number. Ignoring it and using default!");
+                }
+                if (config.colorTemperature.maxValue) {
+                    if (typeof config.colorTemperature.maxValue === "number") {
+                        let maxValue = config.colorTemperature.maxValue;
+
+                        if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
+                            maxValue = Math.floor(1000000 / maxValue);
+                        this.colorTemperature.maxValue = maxValue;
+                    }
+                    else
+                        this.log.warn("'colorTemperature.maxValue' needs to be a number. Ignoring it and using default!");
+                }
+            }
+            else {
+                this.log.warn("Property 'colorTemperature' needs to be an object!");
+                return false;
+            }
+        }
+
+        return true;
+    },
+
+    parsePropertyWithLegacyLocation: function (location, legacyLocation, name, parserFunction) {
+        if (!parserFunction)
+            parserFunction = configParser.parseUrlProperty.bind(configParser);
+
+        if (location[name])
+            return parserFunction(location[name]);
+        else if (legacyLocation && typeof legacyLocation === "object" && legacyLocation[name])
+            return parserFunction(legacyLocation[name]); // backwards compatibility with v0.1.1
+
+        throw new Error("property is required!");
+    },
+
+    parsePattern: function (property) {
+        if (typeof property === "string")
+            return  new RegExp(property);
+        else
+            throw new Error("Unsupported type for pattern");
+    },
+
+    extractNumberFromPattern: function (pattern, string) {
+        const matchArray = string.match(pattern);
+
+        if (matchArray === null) // pattern didn't match at all
+            throw new Error("Pattern didn't match (or body didn't contain the necessary information)! string: " + string);
+        else if (matchArray.length < 2)
+            throw new Error("Couldn't find any group which can be extracted. Did you make sure to put your number pattern into the first group?");
+        else {
+            const value = parseInt(matchArray[1]);
+            if (isNaN(value))
+                throw new Error("Extracted group is not a number!");
+
+            return value;
+        }
+    },
+
+    valueOf: function (enumObject, property, defaultValue) {
+        let value = property || defaultValue;
+        value = value.toLowerCase();
+
+        let valid = false;
+        Object.keys(enumObject).forEach(key => {
+            const objectElement = enumObject[key];
+
+            if (value === objectElement)
+                valid = true;
+        });
+
+        return valid? value: null;
+    },
 
     identify: function (callback) {
         this.log("Identify requested!");
@@ -103,6 +425,9 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getServices: function () {
+        if (!this.homebridgeService)
+            return [];
+
         const informationService = new Service.AccessoryInformation();
 
         informationService
@@ -115,168 +440,319 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     handleNotification: function (body) {
-        const value = body.value;
-
-        let characteristic;
-        switch (body.characteristic) {
-            case "On":
-                characteristic = Characteristic.On;
-                break;
-            case "Brightness":
-                characteristic = Characteristic.Brightness;
-                break;
-            case "Hue":
-                characteristic = Characteristic.Hue;
-                break;
-            case "Saturation":
-                characteristic = Characteristic.Saturation;
-                break;
-            default:
-                this.log("Encountered unknown characteristic handling notification: " + body.characteristic);
-                return;
+        if (!this.homebridgeService.testCharacteristic(body.characteristic)) {
+            this.log("Encountered unknown characteristic when handling notification (or characteristic which wasn't added to the service): " + body.characteristic);
+            return;
         }
 
-        this.log("Updating '" + body.characteristic + "' to new value: " + body.value);
+        let value = body.value;
 
-        this.ignoreNextSet = true;
-        this.homebridgeService.setCharacteristic(characteristic, value);
+        if (body.characteristic === "On" && this.pullTimer)
+            this.pullTimer.resetTimer();
+
+        if (body.characteristic === "ColorTemperature" && this.colorTemperature.unit === TemperatureUnit.KELVIN)
+            value = Math.floor(1000000 / value);
+        if (body.characteristic === "Brightness" && this.brightness.unit === BrightnessUnit.RGB)
+            value = Math.floor((value / 255) * 100);
+
+        this.log("Updating '" + body.characteristic + "' to new value: " + body.value);
+        this.homebridgeService.getCharacteristic(body.characteristic).updateValue(value);
     },
 
     getPowerState: function (callback) {
-        this._doRequest("getPowerState", this.power.statusUrl, "GET", "power.statusUrl", callback, function (body) {
-            const powerOn = parseInt(body) > 0;
-            this.log("power is currently %s", powerOn? "ON": "OFF");
+        if (this.pullTimer)
+            this.pullTimer.resetTimer();
 
-            callback(null, powerOn);
-        }.bind(this));
+        http.httpRequest(this.power.statusUrl, (error, response, body) => {
+           if (error) {
+               this.log("getPowerState() failed: %s", error.message);
+               callback(error);
+           }
+           else if (!http.isHttpSuccessCode(response.statusCode)) {
+               this.log(`getPowerState() http request returned http error code ${response.statusCode}: ${body}`);
+               callback(new Error("Got html error code " + response.statusCode));
+           }
+           else {
+               if (this.debug)
+                   this.log(`getPowerState() request returned successfully (${response.statusCode}). Body: '${body}'`);
+
+               const switchedOn = this.power.statusPattern.test(body);
+               if (this.debug)
+                   this.log("getPowerState() power is currently %s", switchedOn? "ON": "OFF");
+
+               callback(null, switchedOn);
+           }
+        });
     },
 
     setPowerState: function (on, callback) {
-        if (this.ignoreNextSet) {
-            this.ignoreNextSet = false;
-            callback(undefined);
+        // only withhold power request if on === true and light is currently on
+        if (on && this.withholdPowerCall && this.homebridgeService.getCharacteristic(Characteristic.On).value) {
+            this.withholdPowerCall = false;
+            callback();
             return;
         }
 
-        const url = on ? this.power.onUrl : this.power.offUrl;
-        const urlName = on ? "power.onUrl" : "power.offUrl";
+        if (this.pullTimer)
+            this.pullTimer.resetTimer();
 
-        this._doRequest("setPowerState", url, this.power.httpMethod, urlName, callback, function (body) {
-            this.log("power successfully set to %s", on? "ON": "OFF");
+        const urlObject = on ? this.power.onUrl : this.power.offUrl;
+        http.httpRequest(urlObject, (error, response, body) => {
+            if (error) {
+                this.log("setPowerState() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`setPowerState() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`setPowerState() Successfully set power to ${on? "ON": "OFF"}. Body: '${body}'`);
 
-            callback(undefined, body);
-        }.bind(this));
+                callback();
+            }
+        });
     },
 
     getBrightness: function (callback) {
-        this._doRequest("getBrightness", this.brightness.statusUrl, "GET", "brightness.statusUrl", callback, function (body) {
-            const brightness = parseInt(body);
-            this.log("brightness is currently at %s %", brightness);
+        http.httpRequest(this.brightness.statusUrl, (error, response, body) => {
+            if (error) {
+                this.log("getBrightness() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`getBrightness() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`getBrightness() request returned successfully (${response.statusCode}). Body: '${body}'`);
 
-            callback(null, brightness);
-        }.bind(this));
+                let brightness;
+                try {
+                    brightness = this.extractNumberFromPattern(this.brightness.statusPattern, body);
+                } catch (error) {
+                    this.log("getBrightness() error occurred while extracting brightness from body: " + error.message);
+                    callback(new Error("pattern error"));
+                    return;
+                }
+
+                if (this.brightness.unit === BrightnessUnit.RGB)
+                    brightness = Math.floor((brightness / 255) * 100);
+
+                if (brightness >= 0 && brightness <= 100) {
+                    if (this.debug)
+                        this.log(`getBrightness() brightness is currently at ${brightness}%`);
+                    callback(null, brightness);
+                }
+                else {
+                    this.log("getBrightness() brightness is not in range of 0-100 % (actual: %s)", brightness);
+                    callback(new Error("invalid range"));
+                }
+            }
+        });
     },
 
     setBrightness: function (brightness, callback) {
-        if (this.ignoreNextSet) {
-            this.ignoreNextSet = false;
-            callback(undefined);
-            return;
-        }
+        const brightnessPercentage = brightness;
+        if (this.brightness.unit === BrightnessUnit.RGB)
+            brightness = Math.floor((brightness * 255) / 100);
 
-        let url = this.brightness.setUrl;
-        if (url)
-            url = this.brightness.setUrl.replace("%s", brightness);
+        if (this.brightness.withholdPowerUpdate)
+            this.withholdPowerCall = true;
 
-        this._doRequest("setBrightness", url, this.brightness.httpMethod, "brightness.setUrl", callback, function (body) {
-            this.log("brightness successfully set to %s %", brightness);
+        // setting a timeout will make sure that possible ON requests receive first. For some devices this is important
+        setTimeout(() => {
+            http.httpRequest(this.brightness.setUrl, (error, response, body) => {
+                if (error) {
+                    this.log("setBrightness() failed: %s", error.message);
+                    callback(error);
+                }
+                else if (!http.isHttpSuccessCode(response.statusCode)) {
+                    this.log(`setBrightness() http request returned http error code ${response.statusCode}: ${body}`);
+                    callback(new Error("Got html error code " + response.statusCode));
+                }
+                else {
+                    if (this.debug)
+                        this.log(`setBrightness() Successfully set brightness to ${brightnessPercentage}%. Body: '${body}'`);
 
-            callback(undefined, body);
-        }.bind(this));
+                    callback();
+                }
+            }, brightness);
+        }, 0);
     },
 
     getHue: function (callback) {
-        this._doRequest("getHue", this.hue.statusUrl, "GET", "hue.statusUrl", callback, function (body) {
-            const hue = parseFloat(body);
-            this.log("hue is currently at %s", hue);
+        http.httpRequest(this.hue.statusUrl, (error, response, body) => {
+           if (error) {
+               this.log("getHue() failed: %s", error.message);
+               callback(error);
+           }
+           else if (!http.isHttpSuccessCode(response.statusCode)) {
+               this.log(`getHue() http request returned http error code ${response.statusCode}: ${body}`);
+               callback(new Error("Got html error code " + response.statusCode));
+           }
+           else {
+               if (this.debug)
+                   this.log(`getHue() request returned successfully (${response.statusCode}). Body '${body}'`);
 
-            callback(null, hue);
-        }.bind(this));
+               let hue;
+               try {
+                   hue = this.extractNumberFromPattern(this.hue.statusPattern, body);
+               } catch (error) {
+                   this.log("getHue() error occurred while extracting hue from body: " + error.message);
+                   callback(new Error("pattern error"));
+                   return;
+               }
+
+               if (hue >= 0 && hue <= 360) {
+                   if (this.debug)
+                       this.log("getHue() hue is currently at %s", hue);
+                   callback(null, hue);
+               }
+               else {
+                   this.log("getHue() hue is not in range of 0-360 (actual: %s)", hue);
+                   callback(new Error("invalid range"));
+               }
+           }
+        });
     },
 
     setHue: function (hue, callback) {
-        if (this.ignoreNextSet) {
-            this.ignoreNextSet = false;
-            callback(undefined);
-            return;
-        }
+        http.httpRequest(this.hue.setUrl, (error, response, body) => {
+            if (error) {
+                this.log("setHue() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`setHue() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`setHue() Successfully set hue to ${hue}. Body: '${body}'`);
 
-        let url = this.hue.setUrl;
-        if (url)
-            url = this.hue.setUrl.replace("%s", hue);
-
-        this._doRequest("setHue", url, this.hue.httpMethod, "hue.setUrl", callback, function (body) {
-            this.log("hue successfully set to %s", hue);
-
-            callback(undefined, body);
-        }.bind(this));
+                callback();
+            }
+        }, hue);
     },
 
     getSaturation: function (callback) {
-        this._doRequest("getSaturation", this.saturation.statusUrl, "GET", "saturation.statusUrl", callback, function (body) {
-            const saturation = parseFloat(body);
-            this.log("saturation is currently at %s", saturation);
+        http.httpRequest(this.saturation.statusUrl, (error, response, body) => {
+            if (error) {
+                this.log("getSaturation() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`getSaturation() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`getSaturation() request returned successfully (${response.statusCode}). Body '${body}'`);
 
-            callback(null, saturation);
-        }.bind(this));
+                let saturation;
+                try {
+                    saturation = this.extractNumberFromPattern(this.saturation.statusPattern, body);
+                } catch (error) {
+                    this.log("getSaturation() error occurred while extracting saturation from body: " + error.message);
+                    callback(new Error("pattern error"));
+                    return;
+                }
+
+                if (saturation >= 0 && saturation <= 100) {
+                    if (this.debug)
+                        this.log("getSaturation() saturation is currently at %s", saturation);
+                    callback(null, saturation);
+                }
+                else {
+                    this.log("getSaturation() saturation is not in range of 0-100 (actual: %s)", saturation);
+                    callback(new Error("invalid range"));
+                }
+            }
+        });
     },
 
     setSaturation: function (saturation, callback) {
-        if (this.ignoreNextSet) {
-            this.ignoreNextSet = false;
-            callback(undefined);
-            return;
-        }
+        http.httpRequest(this.saturation.setUrl, (error, response, body) => {
+            if (error) {
+                this.log("setSaturation() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`setSaturation() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`setSaturation() Successfully set saturation to ${saturation}. Body: '${body}'`);
 
-        let url = this.saturation.setUrl;
-        if (url)
-            url = this.saturation.setUrl.replace("%s", saturation);
-
-        this._doRequest("setSaturation", url, this.saturation.httpMethod, "saturation.setUrl", callback, function (body) {
-            this.log("saturation successfully set to %s", saturation);
-
-            callback(undefined, body);
-        }.bind(this))
+                callback();
+            }
+        }, saturation);
     },
 
-    _doRequest: function (methodName, url, httpMethod, urlName, callback, successCallback) {
-        if (!url) {
-            this.log.warn("Ignoring " + methodName + "() request, '" + urlName + "' is not defined!");
-            callback(new Error("No '" + urlName + "' defined!"));
-            return;
-        }
+    getColorTemperature: function (callback) {
+        http.httpRequest(this.colorTemperature.statusUrl, (error, response, body) => {
+            if (error) {
+                this.log("getColorTemperature() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`getColorTemperature() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`getColorTemperature() request returned successfully (${response.statusCode}). Body '${body}'`);
 
-        request(
-            {
-                url: url,
-                body: "",
-                method: httpMethod,
-                rejectUnauthorized: false
-            },
-            function (error, response, body) {
-                if (error) {
-                    this.log(methodName + "() failed: %s", error.message);
-                    callback(error);
+                let colorTemperature;
+                try {
+                    colorTemperature = this.extractNumberFromPattern(this.colorTemperature.statusPattern, body);
+                } catch (error) {
+                    this.log("getColorTemperature() error occurred while extracting colorTemperature from body: " + error.message);
+                    callback(new Error("pattern error"));
+                    return;
                 }
-                else if (response.statusCode !== 200) {
-                    this.log(methodName + "() returned http error: %s", response.statusCode);
-                    callback(new Error("Got http error code " + response.statusCode));
+
+                if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
+                    colorTemperature = Math.floor(1000000 / colorTemperature); // converting Kelvin to mired
+
+                if (colorTemperature >= this.colorTemperature.minValue && colorTemperature <= this.colorTemperature.maxValue) {
+                    if (this.debug)
+                        this.log(`getColorTemperature() colorTemperature is currently at ${colorTemperature} Mired`);
+                    callback(null, colorTemperature);
                 }
                 else {
-                    successCallback(body);
+                    this.log("getColorTemperature() colorTemperature is not in range of 0-100 (actual: %s)", colorTemperature);
+                    callback(new Error("invalid range"));
                 }
-            }.bind(this)
-        );
-    }
+            }
+        });
+    },
+
+    setColorTemperature: function (colorTemperature, callback) {
+        const colorTemperatureMired = colorTemperature;
+        if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
+            colorTemperature = Math.floor(1000000 / colorTemperature); // converting mired to Kelvin
+
+        http.httpRequest(this.colorTemperature.setUrl, (error, response, body) => {
+            if (error) {
+                this.log("setColorTemperature() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`setColorTemperature() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`setColorTemperature() Successfully set colorTemperature to ${colorTemperatureMired} Mired. Body: '${body}'`);
+
+                callback();
+            }
+        }, colorTemperature);
+    },
 
 };
