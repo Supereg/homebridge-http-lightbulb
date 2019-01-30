@@ -539,7 +539,7 @@ HTTP_LIGHTBULB.prototype = {
                 }
 
                 if (this.brightness.unit === BrightnessUnit.RGB)
-                    brightness = Math.floor((brightness / 255) * 100);
+                    brightness = Math.round((brightness / 255) * 100);
 
                 if (brightness >= 0 && brightness <= 100) {
                     if (this.debug)
@@ -557,7 +557,7 @@ HTTP_LIGHTBULB.prototype = {
     setBrightness: function (brightness, callback) {
         const brightnessPercentage = brightness;
         if (this.brightness.unit === BrightnessUnit.RGB)
-            brightness = Math.floor((brightness * 255) / 100);
+            brightness = Math.round((brightness * 255) / 100);
 
         if (this.brightness.withholdPowerUpdate)
             this.withholdPowerCall = true;
@@ -717,7 +717,7 @@ HTTP_LIGHTBULB.prototype = {
                 }
 
                 if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
-                    colorTemperature = Math.floor(1000000 / colorTemperature); // converting Kelvin to mired
+                    colorTemperature = Math.round(1000000 / colorTemperature); // converting Kelvin to mired
 
                 if (colorTemperature >= this.colorTemperature.minValue && colorTemperature <= this.colorTemperature.maxValue) {
                     if (this.debug)
@@ -735,7 +735,7 @@ HTTP_LIGHTBULB.prototype = {
     setColorTemperature: function (colorTemperature, callback) {
         const colorTemperatureMired = colorTemperature;
         if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
-            colorTemperature = Math.floor(1000000 / colorTemperature); // converting mired to Kelvin
+            colorTemperature = Math.round(1000000 / colorTemperature); // converting mired to Kelvin
 
         http.httpRequest(this.colorTemperature.setUrl, (error, response, body) => {
             if (error) {
