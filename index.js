@@ -565,21 +565,21 @@ HTTP_LIGHTBULB.prototype = {
         // setting a timeout will make sure that possible ON requests receive first. For some devices this is important
         setTimeout(() => {
             http.httpRequest(this.brightness.setUrl, (error, response, body) => {
-                if (error) {
-                    this.log("setBrightness() failed: %s", error.message);
-                    callback(error);
-                }
-                else if (!http.isHttpSuccessCode(response.statusCode)) {
-                    this.log(`setBrightness() http request returned http error code ${response.statusCode}: ${body}`);
-                    callback(new Error("Got html error code " + response.statusCode));
-                }
-                else {
-                    if (this.debug)
-                        this.log(`setBrightness() Successfully set brightness to ${brightnessPercentage}%. Body: '${body}'`);
+                    if (error) {
+                        this.log("setBrightness() failed: %s", error.message);
+                        callback(error);
+                    }
+                    else if (!http.isHttpSuccessCode(response.statusCode)) {
+                        this.log(`setBrightness() http request returned http error code ${response.statusCode}: ${body}`);
+                        callback(new Error("Got html error code " + response.statusCode));
+                    }
+                    else {
+                        if (this.debug)
+                            this.log(`setBrightness() Successfully set brightness to ${brightnessPercentage}%. Body: '${body}'`);
 
-                    callback();
-                }
-            }, brightness);
+                        callback();
+                    }
+                }, {searchValue: "%s", replacer: `${brightness}`}, this._collectCurrentValuesForReplacer(Characteristic.Brightness));
         }, 0);
     },
 
@@ -635,7 +635,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 callback();
             }
-        }, hue);
+        }, {searchValue: "%s", replacer: `${hue}`}, this._collectCurrentValuesForReplacer(Characteristic.Hue));
     },
 
     getSaturation: function (callback) {
@@ -690,7 +690,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 callback();
             }
-        }, saturation);
+        }, {searchValue: "%s", replacer: `${saturation}`}, this._collectCurrentValuesForReplacer());
     },
 
     getColorTemperature: function (callback) {
@@ -752,7 +752,31 @@ HTTP_LIGHTBULB.prototype = {
 
                 callback();
             }
-        }, colorTemperature);
+        }, {searchValue: "%s", replacer: `${colorTemperature}`}, this._collectCurrentValuesForReplacer());
+    },
+
+    _collectCurrentValuesForReplacer: function() {
+        const args = [];
+
+        if (this.brightness) {
+            const brightness = this.homebridgeService.getCharacteristic(Characteristic.Brightness).value;
+            args.push({searchValue: "%brightness", replacer: `${brightness}`});
+        }
+        if (this.hue) {
+            const hue = this.homebridgeService.getCharacteristic(Characteristic.Hue).value;
+            args.push({searchValue: "%hue", replacer: `${hue}`});
+        }
+        if (this.saturation) {
+            const saturation = this.homebridgeService.getCharacteristic(Characteristic.Saturation).value;
+            args.push({searchValue: "%saturation", replacer: `${saturation}`});
+        }
+        /** @namespace Characteristic.ColorTemperature */
+        if (this.colorTemperature) {
+            const colorTemperature = this.homebridgeService.getCharacteristic(Characteristic.ColorTemperature).value;
+            args.push({searchValue: "%colorTemperature", replacer: `${colorTemperature}`});
+        }
+
+        return args;
     },
 
 };

@@ -76,6 +76,7 @@ The configuration can contain the following properties:
     - `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new brightness level. The brightness is sent in the given unit.  
         When including **"%s"** in the url and/or body it will be replaced with the brightness to set.
+        Have a look at [placeholders](#placeholders-in-seturl-properties).
     - `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current brightness level from the light bulb. By default it expects the http server 
         to return the brightness level in percent (range from 0-100). This can be changed with the `unit` property below.
@@ -100,6 +101,7 @@ The configuration can contain the following properties:
     * `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new hue.  
         When including **"%s"** in the url and/or body it will be replaced with the hue to set.
+        Have a look at [placeholders](#placeholders-in-seturl-properties).
     * `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current hue from the light bulb.
     * `statusPattern` \<string\> **optional** \(Default: **"([0-9]{1,3})"**): Defines a regex pattern with which the 
@@ -112,6 +114,7 @@ The configuration can contain the following properties:
     - `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new saturation level.  
         When including **"%s"** in the url and/or body it will be replaced with the saturation to set.
+        Have a look at [placeholders](#placeholders-in-seturl-properties).
     - `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current saturation level from the light bulb.
     - `statusPattern` \<string\> **optional** \(Default: **"([0-9]{1,3})"**): Defines a regex pattern with which the 
@@ -125,6 +128,7 @@ The configuration can contain the following properties:
     * `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new color temperature. The color temperature is sent in the given unit.  
         When including **"%s"** in the url and/or body it will be replaced with the color temperature to set.
+        Have a look at [placeholders](#placeholders-in-seturl-properties).
     * `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current color temperature from the light bulb. By default it expects the http server 
         to return the brightness level in mired. This can be changed with the `unit` property below.
@@ -165,6 +169,17 @@ pulls updates from your http device. For more information read [pulling updates]
 - `debug` \<boolean\> **optional**: If set to true debug mode is enabled and the plugin prints more detailed information.
 
 In the [Examples](#examples) section are some example configurations to get you started.
+
+##### Placeholders in `setUrl` properties
+On every set there are the following placeholders available which will be replaced with the respective value.  
+Note that for example when the `setUrl` for the brightness characteristic is called, `%s` will be replaced with the 
+**new** value and `%brightness` will be replaced with the **current**/**old** value.
+
+- `%s` will always be replaced with the **new** value which will be set for the current characteristic
+- `%brightness` - current brightness level
+- `%hue` - current hue
+- `%saturation` - current saturation
+- `%colorTemperature` - current color temperature (case sensitise)
 
 #### UrlObject
 
