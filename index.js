@@ -759,7 +759,10 @@ HTTP_LIGHTBULB.prototype = {
         const args = [];
 
         if (this.brightness) {
-            const brightness = this.homebridgeService.getCharacteristic(Characteristic.Brightness).value;
+            let brightness = this.homebridgeService.getCharacteristic(Characteristic.Brightness).value;
+            if (this.brightness.unit === BrightnessUnit.RGB)
+                brightness = Math.round((brightness * 255) / 100);
+
             args.push({searchValue: "%brightness", replacer: `${brightness}`});
         }
         if (this.hue) {
@@ -772,7 +775,10 @@ HTTP_LIGHTBULB.prototype = {
         }
         /** @namespace Characteristic.ColorTemperature */
         if (this.colorTemperature) {
-            const colorTemperature = this.homebridgeService.getCharacteristic(Characteristic.ColorTemperature).value;
+            let colorTemperature = this.homebridgeService.getCharacteristic(Characteristic.ColorTemperature).value;
+            if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
+                colorTemperature = Math.round(1000000 / colorTemperature);
+
             args.push({searchValue: "%colorTemperature", replacer: `${colorTemperature}`});
         }
 

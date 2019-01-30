@@ -173,7 +173,8 @@ In the [Examples](#examples) section are some example configurations to get you 
 ##### Placeholders in `setUrl` properties
 On every set there are the following placeholders available which will be replaced with the respective value.  
 Note that for example when the `setUrl` for the brightness characteristic is called, `%s` will be replaced with the 
-**new** value and `%brightness` will be replaced with the **current**/**old** value.
+**new** value and `%brightness` will be replaced with the **current**/**old** value.  
+The value for the placeholders will be supplied in the specified unit.
 
 - `%s` will always be replaced with the **new** value which will be set for the current characteristic
 - `%brightness` - current brightness level
