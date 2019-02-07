@@ -148,7 +148,7 @@ The configuration can contain the following properties:
 
 ##### Advanced configuration options:
 
-- `auth` \<object\> **optional**: If your http server requires authentication, you can specify your credential in this 
+* `auth` \<object\> **optional**: If your http server requires authentication, you can specify your credential in this 
 object. It uses those credentials for all http requests and thus overrides all possibly specified credentials inside 
 an urlObject for any characteristic.  
 The object can contain the following properties:
@@ -159,6 +159,17 @@ The object can contain the following properties:
         When set to **false** the plugin will send the proper authentication header after receiving an 401 error code 
         (unauthenticated). The response from the http server must include a proper `WWW-Authenticate` header.  
         Digest authentication requires this property to be set to **false**!
+
+- `statusCache` \<number\> **optional** \(Default: **0**\): Defines the amount of time in milliseconds a queried value 
+   of the _On_ characteristic is cached before a new request is made to the http device.  
+   Default is **0** which indicates no caching. A value of **-1** will indicate infinite caching.
+- `brightnessCache` \<number\> **optional** \(Default: **0**\): Same as above, but for the _Brightness_ 
+    characteristic
+- `hueCache` \<number\> **optional** \(Default: **0**\): Same as above, but for the _Hue_ characteristic
+- `saturationCache` \<number\> **optional** \(Default: **0**\): Same as above, but for the _Saturation_ 
+    characteristic
+- `colorTemperatureCache` \<number\> **optional** \(Default: **0**\): Same as above, but for the 
+    _ColorTemperature_ characteristic
 
 * `pullInterval` \<integer\> **optional**: The property expects an interval in **milliseconds** in which the plugin 
 pulls updates from your http device. For more information read [pulling updates](#the-pull-way).  

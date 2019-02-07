@@ -8,6 +8,7 @@ const configParser = _http_base.configParser;
 const PullTimer = _http_base.PullTimer;
 const notifications = _http_base.notifications;
 const MQTTClient = _http_base.MQTTClient;
+const Cache = _http_base.Cache;
 
 const packageJSON = require("./package.json");
 
@@ -40,6 +41,25 @@ function HTTP_LIGHTBULB(log, config) {
         this.log.warn("Aborting...");
         return;
     }
+
+
+    this.statusCache = new Cache(config.statusCache, 0);
+    this.brightnessCache = new Cache(config.brightnessCache, 0);
+    this.hueCache = new Cache(config.hueCache, 0);
+    this.saturationCache = new Cache(config.saturationCache, 0);
+    this.colorTemperatureCache = new Cache(config.colorTemperatureCache, 0);
+
+    if (config.statusCache && typeof config.statusCache !== "number")
+        this.log.warn("Property 'statusCache' was given in an unsupported type. Using default one!");
+    if (config.brightnessCache && typeof config.brightnessCache !== "number")
+        this.log.warn("Property 'brightnessCache' was given in an unsupported type. Using default one!");
+    if (config.hueCache && typeof config.hueCache !== "number")
+        this.log.warn("Property 'hueCache' was given in an unsupported type. Using default one!");
+    if (config.saturationCache && typeof config.saturationCache !== "number")
+        this.log.warn("Property 'saturationCache' was given in an unsupported type. Using default one!");
+    if (config.colorTemperatureCache && typeof config.colorTemperatureCache !== "number")
+        this.log.warn("Property 'colorTemperatureCache' was given in an unsupported type. Using default one!");
+
 
     if (config.auth) {
         if (!(config.auth.username && config.auth.password))
@@ -463,6 +483,15 @@ HTTP_LIGHTBULB.prototype = {
         if (this.pullTimer)
             this.pullTimer.resetTimer();
 
+        if (!this.statusCache.shouldQuery()) {
+            const value = this.homebridgeService.getCharacteristic(Characteristic.On).value;
+            if (this.debug)
+                this.log(`getPowerState() returning cached value '${value? "ON": "OFF"}'${this.statusCache.isInfinite()? " (infinite cache)": ""}`);
+
+            callback(null, value);
+            return;
+        }
+
         http.httpRequest(this.power.statusUrl, (error, response, body) => {
            if (error) {
                this.log("getPowerState() failed: %s", error.message);
@@ -480,6 +509,7 @@ HTTP_LIGHTBULB.prototype = {
                if (this.debug)
                    this.log("getPowerState() power is currently %s", switchedOn? "ON": "OFF");
 
+               this.statusCache.queried();
                callback(null, switchedOn);
            }
         });
@@ -516,6 +546,15 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getBrightness: function (callback) {
+        if (!this.brightnessCache.shouldQuery()) {
+            const value = this.homebridgeService.getCharacteristic(Characteristic.Brightness).value;
+            if (this.debug)
+                this.log(`getBrightness() returning cached value '${value}'${this.brightnessCache.isInfinite()? " (infinite cache)": ""}`);
+
+            callback(null, value);
+            return;
+        }
+
         http.httpRequest(this.brightness.statusUrl, (error, response, body) => {
             if (error) {
                 this.log("getBrightness() failed: %s", error.message);
@@ -544,6 +583,8 @@ HTTP_LIGHTBULB.prototype = {
                 if (brightness >= 0 && brightness <= 100) {
                     if (this.debug)
                         this.log(`getBrightness() brightness is currently at ${brightness}%`);
+
+                    this.brightnessCache.queried();
                     callback(null, brightness);
                 }
                 else {
@@ -584,6 +625,15 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getHue: function (callback) {
+        if (!this.hueCache.shouldQuery()) {
+            const value = this.homebridgeService.getCharacteristic(Characteristic.Hue).value;
+            if (this.debug)
+                this.log(`getHue() returning cached value '${value}'${this.hueCache.isInfinite()? " (infinite cache)": ""}`);
+
+            callback(null, value);
+            return;
+        }
+
         http.httpRequest(this.hue.statusUrl, (error, response, body) => {
            if (error) {
                this.log("getHue() failed: %s", error.message);
@@ -609,6 +659,8 @@ HTTP_LIGHTBULB.prototype = {
                if (hue >= 0 && hue <= 360) {
                    if (this.debug)
                        this.log("getHue() hue is currently at %s", hue);
+
+                   this.hueCache.queried();
                    callback(null, hue);
                }
                else {
@@ -639,6 +691,15 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getSaturation: function (callback) {
+        if (!this.saturationCache.shouldQuery()) {
+            const value = this.homebridgeService.getCharacteristic(Characteristic.Saturation).value;
+            if (this.debug)
+                this.log(`getSaturation() returning cached value '${value}'${this.saturationCache.isInfinite()? " (infinite cache)": ""}`);
+
+            callback(null, value);
+            return;
+        }
+
         http.httpRequest(this.saturation.statusUrl, (error, response, body) => {
             if (error) {
                 this.log("getSaturation() failed: %s", error.message);
@@ -664,6 +725,8 @@ HTTP_LIGHTBULB.prototype = {
                 if (saturation >= 0 && saturation <= 100) {
                     if (this.debug)
                         this.log("getSaturation() saturation is currently at %s", saturation);
+
+                    this.saturationCache.queried();
                     callback(null, saturation);
                 }
                 else {
@@ -694,6 +757,15 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getColorTemperature: function (callback) {
+        if (!this.colorTemperatureCache.shouldQuery()) {
+            const value = this.homebridgeService.getCharacteristic(Characteristic.ColorTemperature).value;
+            if (this.debug)
+                this.log(`getColorTemperature() returning cached value '${value}'${this.colorTemperatureCache.isInfinite()? " (infinite cache)": ""}`);
+
+            callback(null, value);
+            return;
+        }
+
         http.httpRequest(this.colorTemperature.statusUrl, (error, response, body) => {
             if (error) {
                 this.log("getColorTemperature() failed: %s", error.message);
@@ -722,6 +794,8 @@ HTTP_LIGHTBULB.prototype = {
                 if (colorTemperature >= this.colorTemperature.minValue && colorTemperature <= this.colorTemperature.maxValue) {
                     if (this.debug)
                         this.log(`getColorTemperature() colorTemperature is currently at ${colorTemperature} Mired`);
+
+                    this.colorTemperatureCache.queried();
                     callback(null, colorTemperature);
                 }
                 else {
