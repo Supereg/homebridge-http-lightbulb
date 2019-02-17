@@ -203,8 +203,10 @@ HTTP_LIGHTBULB.prototype = {
 
         this.power.statusPattern = /1/; // default pattern
         try {
-            // statusPattern didn't exist in v0.1.1, no need for backwards compatibility lol
-            this.power.statusPattern = configParser.parsePattern(config.statusPattern);
+            if (config.statusPattern) {
+                // statusPattern didn't exist in v0.1.1, no need for backwards compatibility lol
+                this.power.statusPattern = configParser.parsePattern(config.statusPattern);
+            }
         } catch (error) {
             this.log.warn("Property 'power.statusPattern' was given in an unsupported type. Using the default one!");
         }
@@ -237,7 +239,8 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.brightness.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
-                    this.brightness.statusPattern = configParser.parsePattern(config.brightness.statusPattern);
+                    if (this.brightness.statusPattern)
+                        this.brightness.statusPattern = configParser.parsePattern(config.brightness.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'brightness.statusPattern' was given in an unsupported type. Using the default one!");
                 }
@@ -282,7 +285,8 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.hue.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
-                    this.hue.statusPattern = configParser.parsePattern(config.hue.statusPattern);
+                    if (this.hue.statusPattern)
+                        this.hue.statusPattern = configParser.parsePattern(config.hue.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'hue.statusPattern' was given in an unsupported type. Using the default one!");
                 }
@@ -322,7 +326,8 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.saturation.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
-                    this.saturation.statusPattern = configParser.parsePattern(config.saturation.statusPattern);
+                    if (this.saturation.statusPattern)
+                        this.saturation.statusPattern = configParser.parsePattern(config.saturation.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'saturation.statusPattern' was given in an unsupported type. Using the default one!");
                 }
@@ -374,7 +379,8 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.colorTemperature.statusPattern = this.colorTemperature.unit === TemperatureUnit.MICRORECIPROCAL_DEGREE? /([0-9]{2,3})/: /([0-9]{4,5})/; // default pattern
                 try {
-                    this.colorTemperature.statusPattern = configParser.parsePattern(config.colorTemperature.statusPattern);
+                    if (this.colorTemperature.statusPattern)
+                        this.colorTemperature.statusPattern = configParser.parsePattern(config.colorTemperature.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'colorTemperature.statusPattern' was given in an unsupported type. Using the default one!");
                 }
