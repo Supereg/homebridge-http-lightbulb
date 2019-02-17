@@ -9,6 +9,7 @@ const PullTimer = _http_base.PullTimer;
 const notifications = _http_base.notifications;
 const MQTTClient = _http_base.MQTTClient;
 const Cache = _http_base.Cache;
+const utils = _http_base.utils;
 
 const packageJSON = require("./package.json");
 
@@ -203,7 +204,7 @@ HTTP_LIGHTBULB.prototype = {
         this.power.statusPattern = /1/; // default pattern
         try {
             // statusPattern didn't exist in v0.1.1, no need for backwards compatibility lol
-            this.power.statusPattern = this.parsePattern(config.statusPattern);
+            this.power.statusPattern = configParser.parsePattern(config.statusPattern);
         } catch (error) {
             this.log.warn("Property 'power.statusPattern' was given in an unsupported type. Using the default one!");
         }
@@ -228,7 +229,7 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
-                this.brightness.unit = this.valueOf(BrightnessUnit, config.brightness.unit, BrightnessUnit.PERCENT);
+                this.brightness.unit = utils.enumValueOf(BrightnessUnit, config.brightness.unit, BrightnessUnit.PERCENT);
                 if (!this.brightness.unit) {
                     this.log.warn(`${config.brightness.unit} is a unsupported brightness unit!`);
                     return false;
@@ -236,9 +237,17 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.brightness.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
-                    this.brightness.statusPattern = this.parsePattern(config.brightness.statusPattern);
+                    this.brightness.statusPattern = configParser.parsePattern(config.brightness.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'brightness.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+                if (config.brightness.patternGroupToExtract) {
+                    this.brightness.patternGroupToExtract = 1;
+
+                    if (typeof config.brightness.patternGroupToExtract === "number")
+                        this.brightness.patternGroupToExtract = config.brightness.patternGroupToExtract;
+                    else
+                        this.log.warn("Property 'brightness.patternGroupToExtract' must be a number! Using default value!");
                 }
 
 
@@ -273,9 +282,17 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.hue.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
-                    this.hue.statusPattern = this.parsePattern(config.hue.statusPattern);
+                    this.hue.statusPattern = configParser.parsePattern(config.hue.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'hue.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+                if (config.hue.patternGroupToExtract) {
+                    this.hue.patternGroupToExtract = 1;
+
+                    if (typeof config.hue.patternGroupToExtract === "number")
+                        this.hue.patternGroupToExtract = config.hue.patternGroupToExtract;
+                    else
+                        this.log.warn("Property 'hue.patternGroupToExtract' must be a number! Using default value!");
                 }
             }
             else {
@@ -305,9 +322,17 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.saturation.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
-                    this.saturation.statusPattern = this.parsePattern(config.saturation.statusPattern);
+                    this.saturation.statusPattern = configParser.parsePattern(config.saturation.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'saturation.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+                if (config.saturation.patternGroupToExtract) {
+                    this.saturation.patternGroupToExtract = 1;
+
+                    if (typeof config.saturation.patternGroupToExtract === "number")
+                        this.saturation.patternGroupToExtract = config.saturation.patternGroupToExtract;
+                    else
+                        this.log.warn("Property 'saturation.patternGroupToExtract' must be a number! Using default value!");
                 }
             }
             else {
@@ -341,7 +366,7 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
-                this.colorTemperature.unit = this.valueOf(TemperatureUnit, config.colorTemperature.unit, TemperatureUnit.MICRORECIPROCAL_DEGREE);
+                this.colorTemperature.unit = utils.enumValueOf(TemperatureUnit, config.colorTemperature.unit, TemperatureUnit.MICRORECIPROCAL_DEGREE);
                 if (!this.colorTemperature.unit) {
                     this.log.warn(`${config.colorTemperature.unit} is a unsupported temperature unit!`);
                     return false;
@@ -349,9 +374,17 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.colorTemperature.statusPattern = this.colorTemperature.unit === TemperatureUnit.MICRORECIPROCAL_DEGREE? /([0-9]{2,3})/: /([0-9]{4,5})/; // default pattern
                 try {
-                    this.colorTemperature.statusPattern = this.parsePattern(config.colorTemperature.statusPattern);
+                    this.colorTemperature.statusPattern = configParser.parsePattern(config.colorTemperature.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'colorTemperature.statusPattern' was given in an unsupported type. Using the default one!");
+                }
+                if (config.colorTemperature.patternGroupToExtract) {
+                    this.colorTemperature.patternGroupToExtract = 1;
+
+                    if (typeof config.colorTemperature.patternGroupToExtract === "number")
+                        this.colorTemperature.patternGroupToExtract = config.colorTemperature.patternGroupToExtract;
+                    else
+                        this.log.warn("Property 'colorTemperature.patternGroupToExtract' must be a number! Using default value!");
                 }
 
                 this.colorTemperature.minValue = 50; // HAP default values
@@ -399,44 +432,6 @@ HTTP_LIGHTBULB.prototype = {
             return parserFunction(legacyLocation[name]); // backwards compatibility with v0.1.1
 
         throw new Error("property is required!");
-    },
-
-    parsePattern: function (property) {
-        if (typeof property === "string")
-            return  new RegExp(property);
-        else
-            throw new Error("Unsupported type for pattern");
-    },
-
-    extractNumberFromPattern: function (pattern, string) {
-        const matchArray = string.match(pattern);
-
-        if (matchArray === null) // pattern didn't match at all
-            throw new Error("Pattern didn't match (or body didn't contain the necessary information)! string: " + string);
-        else if (matchArray.length < 2)
-            throw new Error("Couldn't find any group which can be extracted. Did you make sure to put your number pattern into the first group?");
-        else {
-            const value = parseInt(matchArray[1]);
-            if (isNaN(value))
-                throw new Error("Extracted group is not a number!");
-
-            return value;
-        }
-    },
-
-    valueOf: function (enumObject, property, defaultValue) {
-        let value = property || defaultValue;
-        value = value.toLowerCase();
-
-        let valid = false;
-        Object.keys(enumObject).forEach(key => {
-            const objectElement = enumObject[key];
-
-            if (value === objectElement)
-                valid = true;
-        });
-
-        return valid? value: null;
     },
 
     identify: function (callback) {
@@ -570,7 +565,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 let brightness;
                 try {
-                    brightness = this.extractNumberFromPattern(this.brightness.statusPattern, body);
+                    brightness = utils.extractValueFromPattern(this.brightness.statusPattern, body, this.brightness.patternGroupToExtract);
                 } catch (error) {
                     this.log("getBrightness() error occurred while extracting brightness from body: " + error.message);
                     callback(new Error("pattern error"));
@@ -649,7 +644,7 @@ HTTP_LIGHTBULB.prototype = {
 
                let hue;
                try {
-                   hue = this.extractNumberFromPattern(this.hue.statusPattern, body);
+                   hue = utils.extractValueFromPattern(this.hue.statusPattern, body, this.hue.patternGroupToExtract);
                } catch (error) {
                    this.log("getHue() error occurred while extracting hue from body: " + error.message);
                    callback(new Error("pattern error"));
@@ -715,7 +710,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 let saturation;
                 try {
-                    saturation = this.extractNumberFromPattern(this.saturation.statusPattern, body);
+                    saturation = utils.extractValueFromPattern(this.saturation.statusPattern, body, this.saturation.patternGroupToExtract);
                 } catch (error) {
                     this.log("getSaturation() error occurred while extracting saturation from body: " + error.message);
                     callback(new Error("pattern error"));
@@ -781,7 +776,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 let colorTemperature;
                 try {
-                    colorTemperature = this.extractNumberFromPattern(this.colorTemperature.statusPattern, body);
+                    colorTemperature = utils.extractValueFromPattern(this.colorTemperature.statusPattern, body, this.colorTemperature.patternGroupToExtract);
                 } catch (error) {
                     this.log("getColorTemperature() error occurred while extracting colorTemperature from body: " + error.message);
                     callback(new Error("pattern error"));
