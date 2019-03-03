@@ -348,11 +348,6 @@ HTTP_LIGHTBULB.prototype = {
 
         if (config.colorTemperature) {
             if (typeof config.colorTemperature === "object") {
-                if (this.hue || this.saturation) {
-                    this.log.warn("When specifying 'colorTemperature' 'hue' and 'saturation' must not be specified!");
-                    return false;
-                }
-
                 if (!config.colorTemperature.setUrl || !config.colorTemperature.statusUrl) {
                     this.log.warn("Property 'colorTemperature' was defined, however some urls are missing!");
                     return false;

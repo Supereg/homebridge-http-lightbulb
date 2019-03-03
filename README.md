@@ -124,7 +124,11 @@ The configuration can contain the following properties:
         is extracted.
 
 * `colorTemperature` \<object\> **optional**: Defines everything related to the _'ColorTemperature'_ characteristic:  
-    _When using `color temperature`, `hue` and `saturation` must not be defined!_
+    _Although the HAP documentation states, that when using `colorTemperature`, `hue` and `saturation` must not 
+    be defined, using all three in combination works perfectly fine.  
+    When selecting something in the color selector the color is sent via the `Hue` and `Saturation` characteristics. 
+    When selecting something in the temperature selector the temperature is sent via the `ColorTemperature` characteristic.  
+    If `colorTemperature` is not specified, the color temperature is sent via the `Hue` and `Saturation` characteristics._
     * `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new color temperature. The color temperature is sent in the given unit.  
         When including **"%s"** in the url and/or body it will be replaced with the color temperature to set.
