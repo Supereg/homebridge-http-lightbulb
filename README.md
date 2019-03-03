@@ -80,10 +80,10 @@ The configuration can contain the following properties:
     - `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current brightness level from the light bulb. By default it expects the http server 
         to return the brightness level in percent (range from 0-100). This can be changed with the `unit` property below.
-    - `unit` \<string\> **optional** \(Default: **"percent**\): Defines unit expected from the http server. The following 
+    - `unit` \<string\> **optional** \(Default: **"percent"**\): Defines unit expected from the http server. The following 
         are available:
         - **"percent"**: Using percent to calculate brightness level
-        - **"rgb"**: Using rgb style (range of 0-255) to calculate brightness level
+        - **"rgb"**: Using rgb style (range of 0-254) to calculate brightness level
     - `statusPattern` \<string\> **optional** \(Default: **"([0-9]{1,3})"**): Defines a regex pattern with which the 
         brightness is extracted from the body of the http response from the `brightness.statusUrl`. The group which should
         be extracted can be configured with the `brightness.patternGroupToExtract` property.
@@ -104,6 +104,11 @@ The configuration can contain the following properties:
         Have a look at [placeholders](#placeholders-in-seturl-properties).
     * `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current hue from the light bulb.
+    * `unit` \<string\> **optional** \(Default: **"hsv"**\): Defines unit expected from the http server. The following 
+        are available:
+        - **"hsv"**: Using standard representation of hue in the HSV system (0-360 degree)
+        - **"zigbee"**: Using a presentation which is popular in Zigbee bridges like the Phillips Hue bridge.
+            The representation of 0-360 is mapped to a range of 0-65535.
     * `statusPattern` \<string\> **optional** \(Default: **"([0-9]{1,3})"**): Defines a regex pattern with which the 
         hue is extracted from the body of the http response from the `hue.statusUrl`. The group which should
         be extracted can be configured with the `hue.patternGroupToExtract` property.
@@ -117,6 +122,10 @@ The configuration can contain the following properties:
         Have a look at [placeholders](#placeholders-in-seturl-properties).
     - `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current saturation level from the light bulb.
+    - `unit` \<string\> **optional** \(Default: **"percent"**\): Defines unit expected from the http server. The following 
+        are available:
+        - **"percent"**: Using percent to calculate saturation level
+        - **"rgb"**: Using rgb style (range of 0-254) to calculate saturation level
     - `statusPattern` \<string\> **optional** \(Default: **"([0-9]{1,3})"**): Defines a regex pattern with which the 
         saturation is extracted from the body of the http response from the `saturation.statusUrl`. The group which should
         be extracted can be configured with the `saturation.patternGroupToExtract` property.
@@ -136,7 +145,7 @@ The configuration can contain the following properties:
     * `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current color temperature from the light bulb. By default it expects the http server 
         to return the brightness level in mired. This can be changed with the `unit` property below.
-    * `unit` \<string\> **optional** \(Default: **"mired**\): Defines unit expected from the http server. The following 
+    * `unit` \<string\> **optional** \(Default: **"mired"**\): Defines unit expected from the http server. The following 
         are available:
         * **"mired"**: Using mired (more specifically _microreciprocal degree_) to calculate color temperature
         * **"kelvin"**: Using Kelvin to calculate color temperature

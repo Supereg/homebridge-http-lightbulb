@@ -27,6 +27,16 @@ const BrightnessUnit = Object.freeze({
     RGB: "rgb",
 });
 
+const HueUnit = Object.freeze({
+    HSV: "hsv",
+    ZIGBEE: "zigbee"
+});
+
+const SaturationUnit = Object.freeze({
+    PERCENT: "percent",
+    RGB: "rgb",
+});
+
 const TemperatureUnit = Object.freeze({
     MICRORECIPROCAL_DEGREE: "mired",
     KELVIN: "kelvin",
@@ -283,6 +293,12 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
+                this.hue.unit = utils.enumValueOf(HueUnit, config.hue.unit, HueUnit.HSV);
+                if (!this.hue.unit) {
+                    this.log.warn(`${config.hue.unit} is a unsupported hue unit!`);
+                    return false;
+                }
+
                 this.hue.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
                     if (this.hue.statusPattern)
@@ -321,6 +337,12 @@ HTTP_LIGHTBULB.prototype = {
                     this.saturation.statusUrl = configParser.parseUrlProperty(config.saturation.statusUrl);
                 } catch (error) {
                     this.log.warn(`Error occurred while parsing 'saturation.${url}': ${error.message}`);
+                    return false;
+                }
+
+                this.saturation.unit = utils.enumValueOf(SaturationUnit, config.saturation.unit, SaturationUnit.PERCENT);
+                if (!this.saturation.unit) {
+                    this.log.warn(`${config.saturation.unit} is a unsupported saturation unit!`);
                     return false;
                 }
 
@@ -465,11 +487,14 @@ HTTP_LIGHTBULB.prototype = {
 
         if (body.characteristic === "On" && this.pullTimer)
             this.pullTimer.resetTimer();
-
-        if (body.characteristic === "ColorTemperature" && this.colorTemperature.unit === TemperatureUnit.KELVIN)
-            value = Math.floor(1000000 / value);
         if (body.characteristic === "Brightness" && this.brightness.unit === BrightnessUnit.RGB)
-            value = Math.floor((value / 255) * 100);
+            value = Math.round((value / 254) * 100);
+        if (body.characteristic === "Hue" && this.hue.unit === HueUnit.ZIGBEE)
+            value = Math.round((value / 360) * 65535);
+        if (body.characteristic === "Saturation" && this.saturation.unit === SaturationUnit.RGB)
+            value = Math.round((value / 254) * 100);
+        if (body.characteristic === "ColorTemperature" && this.colorTemperature.unit === TemperatureUnit.KELVIN)
+            value = Math.round(1000000 / value);
 
         this.log("Updating '" + body.characteristic + "' to new value: " + body.value);
         this.homebridgeService.getCharacteristic(body.characteristic).updateValue(value);
@@ -574,7 +599,7 @@ HTTP_LIGHTBULB.prototype = {
                 }
 
                 if (this.brightness.unit === BrightnessUnit.RGB)
-                    brightness = Math.round((brightness / 255) * 100);
+                    brightness = Math.round((brightness / 254) * 100);
 
                 if (brightness >= 0 && brightness <= 100) {
                     if (this.debug)
@@ -594,7 +619,7 @@ HTTP_LIGHTBULB.prototype = {
     setBrightness: function (brightness, callback) {
         const brightnessPercentage = brightness;
         if (this.brightness.unit === BrightnessUnit.RGB)
-            brightness = Math.round((brightness * 255) / 100);
+            brightness = Math.round((brightness * 254) / 100);
 
         if (this.brightness.withholdPowerUpdate)
             this.withholdPowerCall = true;
@@ -652,6 +677,9 @@ HTTP_LIGHTBULB.prototype = {
                    return;
                }
 
+               if (this.hue.unit === HueUnit.ZIGBEE)
+                   hue = Math.round((hue * 360) / 65535);
+
                if (hue >= 0 && hue <= 360) {
                    if (this.debug)
                        this.log("getHue() hue is currently at %s", hue);
@@ -668,6 +696,10 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setHue: function (hue, callback) {
+        const hueHSV = hue;
+        if (this.hue.unit === HueUnit.ZIGBEE)
+            hue = Math.round((hue / 360) * 65535);
+
         http.httpRequest(this.hue.setUrl, (error, response, body) => {
             if (error) {
                 this.log("setHue() failed: %s", error.message);
@@ -679,7 +711,7 @@ HTTP_LIGHTBULB.prototype = {
             }
             else {
                 if (this.debug)
-                    this.log(`setHue() Successfully set hue to ${hue}. Body: '${body}'`);
+                    this.log(`setHue() Successfully set hue to ${hueHSV}. Body: '${body}'`);
 
                 callback();
             }
@@ -718,9 +750,12 @@ HTTP_LIGHTBULB.prototype = {
                     return;
                 }
 
+                if (this.saturation.unit === SaturationUnit.RGB)
+                    saturation = Math.round((saturation / 254) * 100);
+
                 if (saturation >= 0 && saturation <= 100) {
                     if (this.debug)
-                        this.log("getSaturation() saturation is currently at %s", saturation);
+                        this.log("getSaturation() saturation is currently at %s%", saturation);
 
                     this.saturationCache.queried();
                     callback(null, saturation);
@@ -734,6 +769,10 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     setSaturation: function (saturation, callback) {
+        const saturationPercentage = saturation;
+        if (this.saturation.unit === SaturationUnit.RGB)
+            saturation = Math.round((saturation * 254) / 100);
+
         http.httpRequest(this.saturation.setUrl, (error, response, body) => {
             if (error) {
                 this.log("setSaturation() failed: %s", error.message);
@@ -745,7 +784,7 @@ HTTP_LIGHTBULB.prototype = {
             }
             else {
                 if (this.debug)
-                    this.log(`setSaturation() Successfully set saturation to ${saturation}. Body: '${body}'`);
+                    this.log(`setSaturation() Successfully set saturation to ${saturationPercentage}%. Body: '${body}'`);
 
                 callback();
             }
@@ -831,16 +870,22 @@ HTTP_LIGHTBULB.prototype = {
         if (this.brightness) {
             let brightness = this.homebridgeService.getCharacteristic(Characteristic.Brightness).value;
             if (this.brightness.unit === BrightnessUnit.RGB)
-                brightness = Math.round((brightness * 255) / 100);
+                brightness = Math.round((brightness * 254) / 100);
 
             args.push({searchValue: "%brightness", replacer: `${brightness}`});
         }
         if (this.hue) {
-            const hue = this.homebridgeService.getCharacteristic(Characteristic.Hue).value;
+            let hue = this.homebridgeService.getCharacteristic(Characteristic.Hue).value;
+            if (this.hue.unit === HueUnit.ZIGBEE)
+                hue = Math.round((hue / 360) * 65535);
+
             args.push({searchValue: "%hue", replacer: `${hue}`});
         }
         if (this.saturation) {
-            const saturation = this.homebridgeService.getCharacteristic(Characteristic.Saturation).value;
+            let saturation = this.homebridgeService.getCharacteristic(Characteristic.Saturation).value;
+            if (this.saturation.unit === BrightnessUnit.RGB)
+                saturation = Math.round((saturation * 254) / 100);
+
             args.push({searchValue: "%saturation", replacer: `${saturation}`});
         }
         /** @namespace Characteristic.ColorTemperature */
