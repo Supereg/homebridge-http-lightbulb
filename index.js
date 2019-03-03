@@ -42,10 +42,27 @@ const TemperatureUnit = Object.freeze({
     KELVIN: "kelvin",
 });
 
+/*
+ * Describes the current color mode of the light.
+ * This is only important when using Hue, Saturation and ColorTemperature characteristics together. If so the values
+ * of the characteristics need to be synced up. When setting color temperature the Hue and Saturation characteristics
+ * need to correctly represent the current color temperature via HSV otherwise the Home App gets a bit glitchy.
+ *
+ * Currently this doesn't really work when values are changed via mqtt since my underlying mqtt implementation is
+ * at the moment not designed to allow interception when updating values.
+ */
+const ColorMode = Object.freeze({
+    UNDEFINED: "undefined",
+    COLOR: "color",
+    TEMPERATURE: "temperature",
+});
+
 function HTTP_LIGHTBULB(log, config) {
     this.log = log;
     this.name = config.name;
     this.debug = config.debug || false;
+
+    this.colorMode = ColorMode.UNDEFINED;
 
     const success = this.parseCharacteristics(config);
     if (!success) {
@@ -496,6 +513,11 @@ HTTP_LIGHTBULB.prototype = {
         if (body.characteristic === "ColorTemperature" && this.colorTemperature.unit === TemperatureUnit.KELVIN)
             value = Math.round(1000000 / value);
 
+        if (body.characteristic === "Hue" || body.characteristic === "Saturation")
+            this.colorMode = ColorMode.COLOR;
+        if (body.characteristic === "ColorTemperature")
+            this.colorMode = ColorMode.TEMPERATURE;
+
         this.log("Updating '" + body.characteristic + "' to new value: " + body.value);
         this.homebridgeService.getCharacteristic(body.characteristic).updateValue(value);
 
@@ -649,7 +671,7 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getHue: function (callback) {
-        if (!this.hueCache.shouldQuery()) {
+        if (!this.hueCache.shouldQuery() || this.colorMode === ColorMode.TEMPERATURE) {
             const value = this.homebridgeService.getCharacteristic(Characteristic.Hue).value;
             if (this.debug)
                 this.log(`getHue() returning cached value '${value}'${this.hueCache.isInfinite()? " (infinite cache)": ""}`);
@@ -716,13 +738,14 @@ HTTP_LIGHTBULB.prototype = {
                 if (this.debug)
                     this.log(`setHue() Successfully set hue to ${hueHSV}. Body: '${body}'`);
 
+                this.colorMode = ColorMode.COLOR;
                 callback();
             }
         }, {searchValue: "%s", replacer: `${hue}`}, this._collectCurrentValuesForReplacer(Characteristic.Hue));
     },
 
     getSaturation: function (callback) {
-        if (!this.saturationCache.shouldQuery()) {
+        if (!this.saturationCache.shouldQuery() || this.colorMode === ColorMode.TEMPERATURE) {
             const value = this.homebridgeService.getCharacteristic(Characteristic.Saturation).value;
             if (this.debug)
                 this.log(`getSaturation() returning cached value '${value}'${this.saturationCache.isInfinite()? " (infinite cache)": ""}`);
@@ -789,6 +812,7 @@ HTTP_LIGHTBULB.prototype = {
                 if (this.debug)
                     this.log(`setSaturation() Successfully set saturation to ${saturationPercentage}%. Body: '${body}'`);
 
+                this.colorMode = ColorMode.COLOR;
                 callback();
             }
         }, {searchValue: "%s", replacer: `${saturation}`}, this._collectCurrentValuesForReplacer());
@@ -862,8 +886,12 @@ HTTP_LIGHTBULB.prototype = {
                 if (this.debug)
                     this.log(`setColorTemperature() Successfully set colorTemperature to ${colorTemperatureMired} Mired. Body: '${body}'`);
 
-                this._updateColorByColorTemperature(colorTemperatureMired);
+                // when colorMode is set to TEMPERATURE the hue and saturation characteristics will return cached values
+                // basically the values we calculate in #_updateColorByColorTemperature
+                this.colorMode = ColorMode.TEMPERATURE;
                 callback();
+
+                this._updateColorByColorTemperature(colorTemperatureMired);
             }
         }, {searchValue: "%s", replacer: `${colorTemperature}`}, this._collectCurrentValuesForReplacer());
     },
