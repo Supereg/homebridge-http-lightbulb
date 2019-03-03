@@ -498,6 +498,9 @@ HTTP_LIGHTBULB.prototype = {
 
         this.log("Updating '" + body.characteristic + "' to new value: " + body.value);
         this.homebridgeService.getCharacteristic(body.characteristic).updateValue(value);
+
+        if (this.characteristic === "ColorTemperature")
+            this._updateColorByColorTemperature(value);
     },
 
     getPowerState: function (callback) {
@@ -859,6 +862,7 @@ HTTP_LIGHTBULB.prototype = {
                 if (this.debug)
                     this.log(`setColorTemperature() Successfully set colorTemperature to ${colorTemperatureMired} Mired. Body: '${body}'`);
 
+                this._updateColorByColorTemperature(colorTemperatureMired);
                 callback();
             }
         }, {searchValue: "%s", replacer: `${colorTemperature}`}, this._collectCurrentValuesForReplacer());
@@ -898,6 +902,89 @@ HTTP_LIGHTBULB.prototype = {
         }
 
         return args;
+    },
+
+    _updateColorByColorTemperature: function(colorTemperature) {
+        if (!this.hue && !this.saturation)
+            return;
+
+        const rgbObject = this._temperatureToRGB(colorTemperature);
+        const hsvObject = this._RGBtoHSV(rgbObject.red, rgbObject.green, rgbObject.blue);
+
+        if (this.hue)
+            this.getCharacteristic(Characteristic.Hue).updateValue(hsvObject.hue);
+        if (this.saturation)
+            this.getCharacteristic(Characteristic.Saturation).updateValue(hsvObject.saturation);
+    },
+
+    _temperatureToRGB(temperature) {
+      // temperature gets passed in in Mired
+      temperature = 1000000 / temperature; // algorithm needs temperature in Kelvin
+
+      temperature /= 100;
+
+        let red = 0;
+        let green = 0;
+        let blue = 0;
+
+        if (temperature <= 66)
+            red = 255;
+        else {
+            red = temperature - 60;
+            red = 329.698727446 * (red ^ -0.1332047592);
+            red = Math.min(Math.max(red, 0), 255);
+        }
+
+        if (temperature <= 66) {
+            green = temperature;
+            green = 99.4708025861 * Math.log(green) - 161.1195681661;
+            green = Math.min(Math.max(green, 0), 255);
+        } else {
+            green = temperature - 60;
+            green = 288.1221695283 * (green ^ -0.0755148492);
+            green = Math.min(Math.max(green, 0), 255);
+        }
+
+        if (temperature >= 66)
+            blue = 255;
+        else {
+            if (temperature <= 19)
+                blue = 0;
+            else {
+                blue = temperature - 10;
+                blue = 138.5177312231 * Math.log(blue) - 305.0447927307;
+                blue = Math.min(Math.max(blue, 0), 255);
+            }
+        }
+
+        return {red: red, green: green, blue: blue};
+    },
+
+    _RGBtoHSV: function(r, g, b) {
+        r /= 255;
+        g /= 255;
+        b /= 255;
+
+        const max = Math.max(r, Math.max(g, b));
+        const min = Math.min(r, Math.min(g, b));
+        const delta = max - min;
+
+        let h;
+        let s = max === 0? 0: delta / max;
+        let v = max;
+
+        if (max === min) {
+            h = 0;
+        } else if (max === r) {
+            // noinspection PointlessArithmeticExpressionJS
+            h = 60 * (0 + (g-b) / delta);
+        } else if (max === g) {
+            h = 60 * (2 + (b-r) / delta);
+        } else if (max === b) {
+            h = 60 * (4 + (r-g) / delta);
+        }
+
+        return {hue: Math.round(h), saturation: Math.round(s * 100), value: Math.round(v * 100)};
     },
 
 };
