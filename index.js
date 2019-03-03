@@ -299,7 +299,7 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
-                this.hue.statusPattern = /([0-9]{1,3})/; // default pattern
+                this.hue.statusPattern = this.hue.unit === HueUnit.HSV? /([0-9]{1,3})/: /([0-9]{1,5})/; // default pattern
                 try {
                     if (this.hue.statusPattern)
                         this.hue.statusPattern = configParser.parsePattern(config.hue.statusPattern);

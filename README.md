@@ -109,9 +109,10 @@ The configuration can contain the following properties:
         - **"hsv"**: Using standard representation of hue in the HSV system (0-360 degree)
         - **"zigbee"**: Using a presentation which is popular in Zigbee bridges like the Phillips Hue bridge.
             The representation of 0-360 is mapped to a range of 0-65535.
-    * `statusPattern` \<string\> **optional** \(Default: **"([0-9]{1,3})"**): Defines a regex pattern with which the 
-        hue is extracted from the body of the http response from the `hue.statusUrl`. The group which should
-        be extracted can be configured with the `hue.patternGroupToExtract` property.
+    * `statusPattern` \<string\> **optional** \(Default: **"([0-9]{1,3})"** [**"/([0-9]{1,5})/"** when using zigbee unit]): 
+        Defines a regex pattern with which the hue is extracted from the body of the http response from the 
+        `hue.statusUrl`. The group which should be extracted can be configured with the 
+        `hue.patternGroupToExtract` property.
     * `patternGroupToExtract` <\number\> **optional** \(Default: **1**\): Defines the regex group of which the hue 
         is extracted.
 
