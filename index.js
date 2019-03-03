@@ -912,9 +912,9 @@ HTTP_LIGHTBULB.prototype = {
         const hsvObject = this._RGBtoHSV(rgbObject.red, rgbObject.green, rgbObject.blue);
 
         if (this.hue)
-            this.getCharacteristic(Characteristic.Hue).updateValue(hsvObject.hue);
+            this.homebridgeService.getCharacteristic(Characteristic.Hue).updateValue(hsvObject.hue);
         if (this.saturation)
-            this.getCharacteristic(Characteristic.Saturation).updateValue(hsvObject.saturation);
+            this.homebridgeService.getCharacteristic(Characteristic.Saturation).updateValue(hsvObject.saturation);
     },
 
     _temperatureToRGB(temperature) {
