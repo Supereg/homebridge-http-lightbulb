@@ -287,8 +287,6 @@ A mqttObject can have the following properties:
 * `reconnectPeriod` \<number\> **optional** \(Default: **1000**\): Time in milliseconds after which a reconnect is tried.
 * `connectTimeout` \<number\> **optional** \(Default: **30000**\): Time in milliseconds the client waits until the 
         CONNECT needs to be acknowledged (CONNACK).
-        
-Note: Updating values over mqtt does only support the default unit (regarding brightness and color temperature).
 
 Below is an example of an mqttObject containing the basic properties for a light bulb service:
 ```json

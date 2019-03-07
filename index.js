@@ -47,9 +47,6 @@ const TemperatureUnit = Object.freeze({
  * This is only important when using Hue, Saturation and ColorTemperature characteristics together. If so the values
  * of the characteristics need to be synced up. When setting color temperature the Hue and Saturation characteristics
  * need to correctly represent the current color temperature via HSV otherwise the Home App gets a bit glitchy.
- *
- * Currently this doesn't really work when values are changed via mqtt since my underlying mqtt implementation is
- * at the moment not designed to allow interception when updating values.
  */
 const ColorMode = Object.freeze({
     UNDEFINED: "undefined",
@@ -113,6 +110,26 @@ function HTTP_LIGHTBULB(log, config) {
         }
     }
 
+    /** @namespace config.mqtt */
+    if (config.mqtt) {
+        let options;
+        try {
+            options = configParser.parseMQTTOptions(config.mqtt);
+        } catch (error) {
+            this.log.error("Error occurred while parsing MQTT property: " + error.message);
+            this.log.error("MQTT will not be enabled!");
+        }
+
+        if (options) {
+            try {
+                this.mqttClient = new MQTTClient(this.homebridgeService, options, this.log, this.debug);
+                this.mqttClient.connect();
+            } catch (error) {
+                this.log.error("Error occurred creating mqtt client: " + error.message);
+            }
+        }
+    }
+
     this.homebridgeService = new Service.Lightbulb(this.name);
     this.homebridgeService.getCharacteristic(Characteristic.On)
         .on("get", this.getPowerState.bind(this))
@@ -138,6 +155,18 @@ function HTTP_LIGHTBULB(log, config) {
                maxValue: this.colorTemperature.maxValue
             });
 
+    if (this.mqttClient) {
+        this.mqttClient.on("message-On", this.handleMQTTMessage.bind(this));
+        if (this.brightness)
+            this.mqttClient.on("message-Brightness", this.handleMQTTMessage.bind(this));
+        if (this.hue)
+            this.mqttClient.on("message-Hue", this.handleMQTTMessage.bind(this));
+        if (this.saturation)
+            this.mqttClient.on("message-Saturation", this.handleMQTTMessage.bind(this));
+        if (this.colorTemperature)
+            this.mqttClient.on("message-ColorTemperature", this.handleMQTTMessage.bind(this));
+    }
+
     /** @namespace config.pullInterval */
     if (config.pullInterval) {
         // TODO what is with updating other characteristics. 'On' should be enough for now, since this is probably the characteristic
@@ -152,26 +181,6 @@ function HTTP_LIGHTBULB(log, config) {
     /** @namespace config.notificationPassword */
     if (config.notificationID)
         notifications.enqueueNotificationRegistrationIfDefined(api, log, config.notificationID, config.notificationPassword, this.handleNotification.bind(this));
-
-    /** @namespace config.mqtt */
-    if (config.mqtt) {
-        let options;
-        try {
-            options = configParser.parseMQTTOptions(config.mqtt);
-        } catch (error) {
-            this.log.error("Error occurred while parsing MQTT property: " + error.message);
-            this.log.error("MQTT will not be enabled!");
-        }
-
-        if (options) {
-            try {
-                this.mqttClient = new MQTTClient(this.homebridgeService, options, this.log);
-                this.mqttClient.connect();
-            } catch (error) {
-                this.log.error("Error occurred creating mqtt client: " + error.message);
-            }
-        }
-    }
 
     this.log("Lightbulb successfully configured...");
     if (this.debug) {
@@ -513,6 +522,7 @@ HTTP_LIGHTBULB.prototype = {
         if (body.characteristic === "ColorTemperature" && this.colorTemperature.unit === TemperatureUnit.KELVIN)
             value = Math.round(1000000 / value);
 
+        // TODO make this configurable if such requests should change the colorMode, could be unwanted
         if (body.characteristic === "Hue" || body.characteristic === "Saturation")
             this.colorMode = ColorMode.COLOR;
         if (body.characteristic === "ColorTemperature")
@@ -523,6 +533,27 @@ HTTP_LIGHTBULB.prototype = {
 
         if (this.characteristic === "ColorTemperature")
             this._updateColorByColorTemperature(value);
+    },
+
+    handleMQTTMessage: function (value, callback, characteristic) {
+        if (characteristic === "On" && this.pullTimer)
+            this.pullTimer.resetTimer();
+        if (characteristic === "Brightness" && this.brightness.unit === BrightnessUnit.RGB)
+            value = Math.round((value / 254) * 100);
+        if (characteristic === "Hue" && this.hue.unit === HueUnit.ZIGBEE)
+            value = Math.round((value / 360) * 65535);
+        if (characteristic === "Saturation" && this.saturation.unit === SaturationUnit.RGB)
+            value = Math.round((value / 254) * 100);
+        if (characteristic === "ColorTemperature" && this.colorTemperature.unit === TemperatureUnit.KELVIN)
+            value = Math.round(1000000 / value);
+
+        // TODO make this configurable if such requests should change the colorMode, could be unwanted
+        if (characteristic === "Hue" || characteristic === "Saturation")
+            this.colorMode = ColorMode.COLOR;
+        if (characteristic === "ColorTemperature")
+            this.colorMode = ColorMode.TEMPERATURE;
+
+        callback(value);
     },
 
     getPowerState: function (callback) {
