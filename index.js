@@ -658,7 +658,14 @@ HTTP_LIGHTBULB.prototype = {
                 }
             });
         } else {
-            this.mqttClient.publish(this.power.setTopic, on);
+            this.mqttClient.publish(this.power.setTopic, on, error => {
+                if (error) {
+                    this.log(`setPowerState() error occurred publishing to ${this.power.setTopic}: ${error.message}`);
+                } else if (this.debug) {
+                    this.log(`setPowerState() Successfully set power to ${on ? "ON" : "OFF"}`);
+                }
+                callback(error);
+            });
         }
     },
 
