@@ -130,6 +130,15 @@ function HTTP_LIGHTBULB(log, config) {
         }
     }
 
+    if (this.power.isMqtt) {
+        if (!this.mqttClient) { // TODO maybe also somehow check if the client is connected
+            this.log.warn("MQTT topics where specified however no mqtt client could be established. Is the 'mqtt' property specified?");
+            return;
+        }
+
+        this.mqttClient.subscribe(this.power.getTopic, "On");
+    }
+
     this.homebridgeService = new Service.Lightbulb(this.name);
     this.homebridgeService.getCharacteristic(Characteristic.On)
         .on("get", this.getPowerState.bind(this))
@@ -224,16 +233,39 @@ HTTP_LIGHTBULB.prototype = {
     parseCharacteristics: function (config) {
         this.power = {};
 
-        let url;
-        try {
-            url = "onUrl";
-            this.power.onUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
-            url = "offUrl";
-            this.power.offUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
-            url = "statusUrl";
-            this.power.statusUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
-        } catch (error) {
-            this.log.warn(`Error occurred while parsing '${url}': ${error.message}`);
+        /** @namespace config.setPowerTopic */
+        /** @namespace config.getPowerTopic */
+        if (config.setPowerTopic && config.getPowerTopic) {
+            this.power.isMqtt = true;
+            try {
+                this.power.setTopic = configParser.parseMQTTSetTopicProperty(config.setPowerTopic);
+            } catch (error) {
+                this.log.warn(`Error occurred while parsing 'setPowerTopic': ${error.message}`);
+                return false;
+            }
+            try {
+                this.power.getTopic = configParser.parseMQTTGetTopicProperty(config.getPowerTopic);
+            } catch (error) {
+                this.log.warn(`Error occurred while parsing 'getPowerTopic': ${error.message}`);
+                return false;
+            }
+        } else if ((config.onUrl || config.power.onUrl) && (config.offUrl || config.power.offUrl)
+            && (config.statusUrl || config.power.statusUrl)) {
+            let url;
+            try {
+                url = "onUrl";
+                this.power.onUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
+                url = "offUrl";
+                this.power.offUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
+                url = "statusUrl";
+                this.power.statusUrl = this.parsePropertyWithLegacyLocation(config, config.power, url);
+            } catch (error) {
+                this.log.warn(`Error occurred while parsing '${url}': ${error.message}`);
+                return false;
+            }
+        } else {
+            // couldn't detect which way to go
+            this.log.warn("Couldn't detect a proper configuration for power!"); // TODO message
             return false;
         }
 
@@ -560,9 +592,10 @@ HTTP_LIGHTBULB.prototype = {
         if (this.pullTimer)
             this.pullTimer.resetTimer();
 
-        if (!this.statusCache.shouldQuery()) {
+        // if mqtt is enabled just return the current value
+        if (this.power.isMqtt || !this.statusCache.shouldQuery()) {
             const value = this.homebridgeService.getCharacteristic(Characteristic.On).value;
-            if (this.debug)
+            if (this.debug) // TODO adjust log message if we got here because mqtt was enabled
                 this.log(`getPowerState() returning cached value '${value? "ON": "OFF"}'${this.statusCache.isInfinite()? " (infinite cache)": ""}`);
 
             callback(null, value);
@@ -570,25 +603,25 @@ HTTP_LIGHTBULB.prototype = {
         }
 
         http.httpRequest(this.power.statusUrl, (error, response, body) => {
-           if (error) {
-               this.log("getPowerState() failed: %s", error.message);
-               callback(error);
-           }
-           else if (!http.isHttpSuccessCode(response.statusCode)) {
-               this.log(`getPowerState() http request returned http error code ${response.statusCode}: ${body}`);
-               callback(new Error("Got html error code " + response.statusCode));
-           }
-           else {
-               if (this.debug)
-                   this.log(`getPowerState() request returned successfully (${response.statusCode}). Body: '${body}'`);
+            if (error) {
+                this.log("getPowerState() failed: %s", error.message);
+                callback(error);
+            }
+            else if (!http.isHttpSuccessCode(response.statusCode)) {
+                this.log(`getPowerState() http request returned http error code ${response.statusCode}: ${body}`);
+                callback(new Error("Got html error code " + response.statusCode));
+            }
+            else {
+                if (this.debug)
+                    this.log(`getPowerState() request returned successfully (${response.statusCode}). Body: '${body}'`);
 
-               const switchedOn = this.power.statusPattern.test(body);
-               if (this.debug)
-                   this.log("getPowerState() power is currently %s", switchedOn? "ON": "OFF");
+                const switchedOn = this.power.statusPattern.test(body);
+                if (this.debug)
+                    this.log("getPowerState() power is currently %s", switchedOn? "ON": "OFF");
 
-               this.statusCache.queried();
-               callback(null, switchedOn);
-           }
+                this.statusCache.queried();
+                callback(null, switchedOn);
+            }
         });
     },
 
@@ -603,23 +636,27 @@ HTTP_LIGHTBULB.prototype = {
         if (this.pullTimer)
             this.pullTimer.resetTimer();
 
-        const urlObject = on ? this.power.onUrl : this.power.offUrl;
-        http.httpRequest(urlObject, (error, response, body) => {
-            if (error) {
-                this.log("setPowerState() failed: %s", error.message);
-                callback(error);
-            }
-            else if (!http.isHttpSuccessCode(response.statusCode)) {
-                this.log(`setPowerState() http request returned http error code ${response.statusCode}: ${body}`);
-                callback(new Error("Got html error code " + response.statusCode));
-            }
-            else {
-                if (this.debug)
-                    this.log(`setPowerState() Successfully set power to ${on? "ON": "OFF"}. Body: '${body}'`);
+        if (!this.power.isMqtt) {
+            const urlObject = on ? this.power.onUrl : this.power.offUrl;
+            http.httpRequest(urlObject, (error, response, body) => {
+                if (error) {
+                    this.log("setPowerState() failed: %s", error.message);
+                    callback(error);
+                }
+                else if (!http.isHttpSuccessCode(response.statusCode)) {
+                    this.log(`setPowerState() http request returned http error code ${response.statusCode}: ${body}`);
+                    callback(new Error("Got html error code " + response.statusCode));
+                }
+                else {
+                    if (this.debug)
+                        this.log(`setPowerState() Successfully set power to ${on? "ON": "OFF"}. Body: '${body}'`);
 
-                callback();
-            }
-        });
+                    callback();
+                }
+            });
+        } else {
+            this.mqttClient.publish(this.power.setTopic, on);
+        }
     },
 
     getBrightness: function (callback) {

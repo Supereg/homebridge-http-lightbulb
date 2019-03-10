@@ -195,6 +195,31 @@ pulls updates from your http device. For more information read [pulling updates]
 
 In the [Examples](#examples) section are some example configurations to get you started.
 
+##### Experimental configuration options
+
+The options in this section are all part of some experimental features and can change in any update.  
+
+I'm currently experimenting with allowing setting and querying device status with mqtt alongside http. 
+So that you are for example able to manage the ON characteristic fully over mqtt and the color and 
+brightness values over http. Currently this is only supported for the ON characteristic but I'm planning
+to add this for any combination of characteristics and in the long run also to get added into my 
+homebridge-http-switch plugin if everything works well.
+
+
+* `setPowerTopic` \<string | object\> **optional**: Defines the mqtt topic to which a message is published when you
+    turn the light on or off. 
+    * `topic` \<string\> **required**:
+    * `qos` \<number\> **optional** \(Default: **0**\):
+    * `retain` \<boolean\> **optional** \(Default: **false**\):
+    * `dup` \<boolean\> **optional** \(Default: **false**\):
+    * `payloadFormatter` \<function body\> **optional**:
+* `getPowerTopic` \<string | object\> **optional**: Defines the mqtt topic which is subscribed to in order
+    to receive updates of the current power state of the light.
+    * `topic` \<string\> **required**:
+    * `qos` \<number\> **optional** \(Default: **0**\):
+    * `messagePattern` \<string\> **optional**:
+    * `patternGroupToExtract` \<number\> **optional** \(Default: **1**\):
+
 ##### Placeholders in `setUrl` properties
 On every set there are the following placeholders available which will be replaced with the respective value.  
 Note that for example when the `setUrl` for the brightness characteristic is called, `%s` will be replaced with the 
