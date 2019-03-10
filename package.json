@@ -1,6 +1,6 @@
 {
   "name": "homebridge-http-lightbulb",
-  "version": "1.0.12",
+  "version": "1.1.0",
   "description": "Http lightbulb for Homebridge",
   "license": "ISC",
   "keywords": [
