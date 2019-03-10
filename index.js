@@ -110,6 +110,31 @@ function HTTP_LIGHTBULB(log, config) {
         }
     }
 
+    const homebridgeService = new Service.Lightbulb(this.name);
+    homebridgeService.getCharacteristic(Characteristic.On)
+        .on("get", this.getPowerState.bind(this))
+        .on("set", this.setPowerState.bind(this));
+    if (this.brightness)
+        homebridgeService.addCharacteristic(Characteristic.Brightness)
+            .on("get", this.getBrightness.bind(this))
+            .on("set", this.setBrightness.bind(this));
+    if (this.hue)
+        homebridgeService.addCharacteristic(Characteristic.Hue)
+            .on("get", this.getHue.bind(this))
+            .on("set", this.setHue.bind(this));
+    if (this.saturation)
+        homebridgeService.addCharacteristic(Characteristic.Saturation)
+            .on("get", this.getSaturation.bind(this))
+            .on("set", this.setSaturation.bind(this));
+    if (this.colorTemperature)
+        homebridgeService.addCharacteristic(Characteristic.ColorTemperature)
+            .on("get", this.getColorTemperature.bind(this))
+            .on("set", this.setColorTemperature.bind(this))
+            .setProps({
+                minValue: this.colorTemperature.minValue,
+                maxValue: this.colorTemperature.maxValue
+            });
+
     /** @namespace config.mqtt */
     if (config.mqtt) {
         let options;
@@ -122,7 +147,7 @@ function HTTP_LIGHTBULB(log, config) {
 
         if (options) {
             try {
-                this.mqttClient = new MQTTClient(this.homebridgeService, options, this.log, this.debug);
+                this.mqttClient = new MQTTClient(homebridgeService, options, this.log, this.debug);
                 this.mqttClient.connect();
             } catch (error) {
                 this.log.error("Error occurred creating mqtt client: " + error.message);
@@ -139,30 +164,8 @@ function HTTP_LIGHTBULB(log, config) {
         this.mqttClient.subscribe(this.power.getTopic, "On");
     }
 
-    this.homebridgeService = new Service.Lightbulb(this.name);
-    this.homebridgeService.getCharacteristic(Characteristic.On)
-        .on("get", this.getPowerState.bind(this))
-        .on("set", this.setPowerState.bind(this));
-    if (this.brightness)
-        this.homebridgeService.addCharacteristic(Characteristic.Brightness)
-            .on("get", this.getBrightness.bind(this))
-            .on("set", this.setBrightness.bind(this));
-    if (this.hue)
-        this.homebridgeService.addCharacteristic(Characteristic.Hue)
-            .on("get", this.getHue.bind(this))
-            .on("set", this.setHue.bind(this));
-    if (this.saturation)
-        this.homebridgeService.addCharacteristic(Characteristic.Saturation)
-            .on("get", this.getSaturation.bind(this))
-            .on("set", this.setSaturation.bind(this));
-    if (this.colorTemperature)
-        this.homebridgeService.addCharacteristic(Characteristic.ColorTemperature)
-            .on("get", this.getColorTemperature.bind(this))
-            .on("set", this.setColorTemperature.bind(this))
-            .setProps({
-               minValue: this.colorTemperature.minValue,
-               maxValue: this.colorTemperature.maxValue
-            });
+    // config parse successfully and nothing can interrupt the startup anymore => so we assign the service to the global variable
+    this.homebridgeService = homebridgeService;
 
     if (this.mqttClient) {
         this.mqttClient.on("message-On", this.handleMQTTMessage.bind(this));
@@ -229,6 +232,26 @@ function HTTP_LIGHTBULB(log, config) {
 }
 
 HTTP_LIGHTBULB.prototype = {
+
+    identify: function (callback) {
+        this.log("Identify requested!");
+        callback();
+    },
+
+    getServices: function () {
+        if (!this.homebridgeService)
+            return [];
+
+        const informationService = new Service.AccessoryInformation();
+
+        informationService
+            .setCharacteristic(Characteristic.Manufacturer, "Andreas Bauer")
+            .setCharacteristic(Characteristic.Model, "HTTP Lightbulb")
+            .setCharacteristic(Characteristic.SerialNumber, "LB01")
+            .setCharacteristic(Characteristic.FirmwareRevision, packageJSON.version);
+
+        return [informationService, this.homebridgeService];
+    },
 
     parseCharacteristics: function (config) {
         this.power = {};
@@ -513,26 +536,6 @@ HTTP_LIGHTBULB.prototype = {
             return parserFunction(legacyLocation[name]); // backwards compatibility with v0.1.1
 
         throw new Error("property is required!");
-    },
-
-    identify: function (callback) {
-        this.log("Identify requested!");
-        callback();
-    },
-
-    getServices: function () {
-        if (!this.homebridgeService)
-            return [];
-
-        const informationService = new Service.AccessoryInformation();
-
-        informationService
-            .setCharacteristic(Characteristic.Manufacturer, "Andreas Bauer")
-            .setCharacteristic(Characteristic.Model, "HTTP Lightbulb")
-            .setCharacteristic(Characteristic.SerialNumber, "LB01")
-            .setCharacteristic(Characteristic.FirmwareRevision, packageJSON.version);
-
-        return [informationService, this.homebridgeService];
     },
 
     handleNotification: function (body) {
