@@ -18,9 +18,9 @@
     "homebridge": ">=0.4.8"
   },
   "dependencies": {
-    "homebridge-http-base": "1.3.6"
+    "homebridge-http-base": "1.3.7"
   },
   "devDependencies": {
-    "hap-nodejs": "^0.4.48"
+    "hap-nodejs": "^0.4.51"
   }
 }
