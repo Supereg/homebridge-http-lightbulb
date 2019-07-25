@@ -237,7 +237,8 @@ The value for the placeholders will be supplied in the specified unit.
 A urlObject can have the following properties:
 * `url` \<string\> **required**: Defines the url pointing to your http server
 * `method` \<string\> **optional** \(Default: **"GET"**\): Defines the http method used to make the http request
-* `body` \<string\> **optional**: Defines the body sent with the http request
+* `body` \<any\> **optional**: Defines the body sent with the http request. If value is not a string it will be
+converted to a JSON string automatically.
 * `strictSSL` \<boolean\> **optional** \(Default: **false**\): If enabled the SSL certificate used must be valid and 
 the whole certificate chain must be trusted. The default is false because most people will work with self signed 
 certificates in their homes and their devices are already authorized since being in their networks.
