@@ -1,5 +1,11 @@
-
 # homebridge-http-lightbulb Plugin
+
+[![npm](https://img.shields.io/npm/v/homebridge-http-lightbulb?style=for-the-badge)](https://www.npmjs.com/package/homebridge-http-lightbulb)
+[![npm](https://img.shields.io/npm/dt/homebridge-http-lightbulb?style=for-the-badge)](https://www.npmjs.com/package/homebridge-http-lightbulb)
+[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/Supereg/homebridge-http-lightbulb/Node-CI?style=for-the-badge)](https://github.com/Supereg/homebridge-http-lightbulb/actions?query=workflow%3A%22Node-CI%22)
+[![GitHub issues](https://img.shields.io/github/issues/Supereg/homebridge-http-lightbulb?style=for-the-badge)](https://github.com/Supereg/homebridge-http-lightbulb/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/Supereg/homebridge-http-lightbulb?style=for-the-badge)](https://github.com/Supereg/homebridge-http-lightbulb/pulls)
+
 
 `homebridge-http-lightbulb` is a [Homebridge](https://github.com/nfarina/homebridge) plugin with which you can configure 
 HomeKit light bulbs which forward any requests to a defined http server. This comes in handy when you already have home 
