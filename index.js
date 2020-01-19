@@ -744,7 +744,7 @@ HTTP_LIGHTBULB.prototype = {
 
                         callback();
                     }
-                }, {searchValue: "%s", replacer: `${brightness}`}, this._collectCurrentValuesForReplacer(Characteristic.Brightness));
+                }, {searchValue: "%s", replacer: `${brightness}`}, ...this._collectCurrentValuesForReplacer());
         }, 0);
     },
 
@@ -819,7 +819,7 @@ HTTP_LIGHTBULB.prototype = {
                 this.colorMode = ColorMode.COLOR;
                 callback();
             }
-        }, {searchValue: "%s", replacer: `${hue}`}, this._collectCurrentValuesForReplacer(Characteristic.Hue));
+        }, {searchValue: "%s", replacer: `${hue}`}, ...this._collectCurrentValuesForReplacer());
     },
 
     getSaturation: function (callback) {
@@ -893,7 +893,7 @@ HTTP_LIGHTBULB.prototype = {
                 this.colorMode = ColorMode.COLOR;
                 callback();
             }
-        }, {searchValue: "%s", replacer: `${saturation}`}, this._collectCurrentValuesForReplacer());
+        }, {searchValue: "%s", replacer: `${saturation}`}, ...this._collectCurrentValuesForReplacer());
     },
 
     getColorTemperature: function (callback) {
@@ -971,7 +971,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 this._updateColorByColorTemperature(colorTemperatureMired);
             }
-        }, {searchValue: "%s", replacer: `${colorTemperature}`}, this._collectCurrentValuesForReplacer());
+        }, {searchValue: "%s", replacer: `${colorTemperature}`}, ...this._collectCurrentValuesForReplacer());
     },
 
     _collectCurrentValuesForReplacer: function() {
