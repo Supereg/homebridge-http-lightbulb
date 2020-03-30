@@ -977,6 +977,9 @@ HTTP_LIGHTBULB.prototype = {
     _collectCurrentValuesForReplacer: function() {
         const args = [];
 
+        let on = this.homebridgeService.getCharacteristic(Characteristic.On).value;
+        args.push({searchValue: '"%on"', replacer: on ? 1 : 0});
+
         if (this.brightness) {
             let brightness = this.homebridgeService.getCharacteristic(Characteristic.Brightness).value;
             if (this.brightness.unit === BrightnessUnit.RGB)
