@@ -322,6 +322,7 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
+                this.brightness.numericValue = config.brightness.numericValue || false;
                 this.brightness.unit = utils.enumValueOf(BrightnessUnit, config.brightness.unit, BrightnessUnit.PERCENT);
                 if (!this.brightness.unit) {
                     this.log.warn(`${config.brightness.unit} is a unsupported brightness unit!`);
@@ -374,6 +375,7 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
+                this.hue.numericValue = config.hue.numericValue || false;
                 this.hue.unit = utils.enumValueOf(HueUnit, config.hue.unit, HueUnit.HSV);
                 if (!this.hue.unit) {
                     this.log.warn(`${config.hue.unit} is a unsupported hue unit!`);
@@ -401,6 +403,7 @@ HTTP_LIGHTBULB.prototype = {
                 return false;
             }
         }
+
         if (config.saturation) {
             if (typeof config.saturation === "object") {
                 if (!config.saturation.setUrl || !config.saturation.statusUrl) {
@@ -421,6 +424,7 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
+                this.saturation.numericValue = config.saturation.numericValue || false;
                 this.saturation.unit = utils.enumValueOf(SaturationUnit, config.saturation.unit, SaturationUnit.PERCENT);
                 if (!this.saturation.unit) {
                     this.log.warn(`${config.saturation.unit} is a unsupported saturation unit!`);
@@ -469,6 +473,7 @@ HTTP_LIGHTBULB.prototype = {
                     return false;
                 }
 
+                this.colorTemperature.numericValue = config.colorTemperature.numericValue || false;
                 this.colorTemperature.unit = utils.enumValueOf(TemperatureUnit, config.colorTemperature.unit, TemperatureUnit.MICRORECIPROCAL_DEGREE);
                 if (!this.colorTemperature.unit) {
                     this.log.warn(`${config.colorTemperature.unit} is a unsupported temperature unit!`);
@@ -744,7 +749,7 @@ HTTP_LIGHTBULB.prototype = {
 
                         callback();
                     }
-                }, {searchValue: "%s", replacer: `${brightness}`}, ...this._collectCurrentValuesForReplacer());
+                }, {searchValue: this.brightness.numericValue ? '"%s"' : "%s", replacer: `${brightness}`}, ...this._collectCurrentValuesForReplacer());
         }, 0);
     },
 
@@ -819,7 +824,7 @@ HTTP_LIGHTBULB.prototype = {
                 this.colorMode = ColorMode.COLOR;
                 callback();
             }
-        }, {searchValue: "%s", replacer: `${hue}`}, ...this._collectCurrentValuesForReplacer());
+        }, {searchValue: this.hue.numericValue ? '"%s"' : "%s", replacer: `${hue}`}, ...this._collectCurrentValuesForReplacer());
     },
 
     getSaturation: function (callback) {
@@ -893,7 +898,7 @@ HTTP_LIGHTBULB.prototype = {
                 this.colorMode = ColorMode.COLOR;
                 callback();
             }
-        }, {searchValue: "%s", replacer: `${saturation}`}, ...this._collectCurrentValuesForReplacer());
+        }, {searchValue: this.saturation.numericValue ? '"%s"' : "%s", replacer: `${saturation}`}, ...this._collectCurrentValuesForReplacer());
     },
 
     getColorTemperature: function (callback) {
@@ -971,7 +976,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 this._updateColorByColorTemperature(colorTemperatureMired);
             }
-        }, {searchValue: "%s", replacer: `${colorTemperature}`}, ...this._collectCurrentValuesForReplacer());
+        }, {searchValue: this.colorTemperature.numericValue ? '"%s"' : "%s", replacer: `${colorTemperature}`}, ...this._collectCurrentValuesForReplacer());
     },
 
     _collectCurrentValuesForReplacer: function() {
@@ -979,32 +984,44 @@ HTTP_LIGHTBULB.prototype = {
 
         if (this.brightness) {
             let brightness = this.homebridgeService.getCharacteristic(Characteristic.Brightness).value;
+            let searchValue = "%brightness";
             if (this.brightness.unit === BrightnessUnit.RGB)
                 brightness = Math.round((brightness * 254) / 100);
+            if (this.brightness.numericValue)
+                searchValue = '"%brightness"'
 
-            args.push({searchValue: "%brightness", replacer: `${brightness}`});
+            args.push({searchValue, replacer: `${brightness}`});
         }
         if (this.hue) {
             let hue = this.homebridgeService.getCharacteristic(Characteristic.Hue).value;
+            let searchValue = "%hue";
             if (this.hue.unit === HueUnit.ZIGBEE)
                 hue = Math.round((hue / 360) * 65535);
+            if (this.hue.numericValue)
+                searchValue = `"${searchValue}"`
 
-            args.push({searchValue: "%hue", replacer: `${hue}`});
+            args.push({searchValue, replacer: `${hue}`});
         }
         if (this.saturation) {
             let saturation = this.homebridgeService.getCharacteristic(Characteristic.Saturation).value;
+            let searchValue = "%saturation";
             if (this.saturation.unit === BrightnessUnit.RGB)
                 saturation = Math.round((saturation * 254) / 100);
+            if (this.saturation.numericValue)
+                searchValue = `"${searchValue}"`
 
-            args.push({searchValue: "%saturation", replacer: `${saturation}`});
+            args.push({searchValue, replacer: `${saturation}`});
         }
         /** @namespace Characteristic.ColorTemperature */
         if (this.colorTemperature) {
             let colorTemperature = this.homebridgeService.getCharacteristic(Characteristic.ColorTemperature).value;
+            let searchValue = "%colorTemperature";
             if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
                 colorTemperature = Math.round(1000000 / colorTemperature);
+            if (this.colorTemperature.numericValue)
+                searchValue = `"${searchValue}"`
 
-            args.push({searchValue: "%colorTemperature", replacer: `${colorTemperature}`});
+            args.push({searchValue, replacer: `${colorTemperature}`});
         }
 
         return args;
