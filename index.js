@@ -656,7 +656,7 @@ HTTP_LIGHTBULB.prototype = {
 
                     callback();
                 }
-            });
+            }, ...this._collectCurrentValuesForReplacer());
         } else {
             this.mqttClient.publish(this.power.setTopic, on, error => {
                 if (error) {
