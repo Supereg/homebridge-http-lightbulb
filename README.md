@@ -81,7 +81,7 @@ The configuration can contain the following properties:
 - `brightness` \<object\> **optional**: Defines everything related to the _'Brightness'_ characteristic:
     - `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new brightness level. The brightness is sent in the given unit.  
-        When including **"%s"** in the url and/or body it will be replaced with the brightness to set.
+        When including **%s** in the url and/or body it will be with the brightness to set.
         Have a look at [placeholders](#placeholders-in-seturl-properties).
     - `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current brightness level from the light bulb. By default it expects the http server 
@@ -106,7 +106,7 @@ The configuration can contain the following properties:
 * `hue` \<object\> **optional**: Defines everything related to the _'Hue'_ characteristic:
     * `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new hue.  
-        When including **"%s"** in the url and/or body it will be replaced with the hue to set.
+        When including **%s** in the url and/or body it will be replaced with the hue to set.
         Have a look at [placeholders](#placeholders-in-seturl-properties).
     * `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current hue from the light bulb.
@@ -125,7 +125,7 @@ The configuration can contain the following properties:
 - `saturation` \<object\> **optional**: Defines everything related to the _'Saturation'_ characteristic:
     - `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new saturation level.  
-        When including **"%s"** in the url and/or body it will be replaced with the saturation to set.
+        When including **%s** in the url and/or body it will be replaced with the saturation to set.
         Have a look at [placeholders](#placeholders-in-seturl-properties).
     - `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current saturation level from the light bulb.
@@ -147,7 +147,7 @@ The configuration can contain the following properties:
     If `colorTemperature` is not specified, the color temperature is sent via the `Hue` and `Saturation` characteristics._
     * `setUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using
         an urlObject) which is called when you set a new color temperature. The color temperature is sent in the given unit.  
-        When including **"%s"** in the url and/or body it will be replaced with the color temperature to set.
+        When including **%s** in the url and/or body it will be replaced with the color temperature to set.
         Have a look at [placeholders](#placeholders-in-seturl-properties).
     * `statusUrl` \<string | [urlObject](#urlobject)\> **required**: Defines the url (and other properties when using 
         and urlObject) to query the current color temperature from the light bulb. By default it expects the http server 
@@ -243,7 +243,7 @@ The value for the placeholders will be supplied in the specified unit.
 A urlObject can have the following properties:
 * `url` \<string\> **required**: Defines the url pointing to your http server
 * `method` \<string\> **optional** \(Default: **"GET"**\): Defines the http method used to make the http request
-* `body` \<any\> **optional**: Defines the body sent with the http request. If value is not a string it will be
+* `body` \<any\> **optional**: Defines the body sent with the http request. This is usually a string for maximum flexibility with [placeholders](#placeholders-in-seturl-properties). If the value is not a string, it will be
 converted to a JSON string automatically.
 * `strictSSL` \<boolean\> **optional** \(Default: **false**\): If enabled the SSL certificate used must be valid and 
 the whole certificate chain must be trusted. The default is false because most people will work with self signed 
@@ -394,7 +394,7 @@ Note that every url is simply a string and are only examples. You could also def
 }
 ````
 
-### Light bulb support color temperature
+#### Light bulb support color temperature
 ````json
 {
   "accessory": "HTTP-LIGHTBULB",
@@ -413,6 +413,45 @@ Note that every url is simply a string and are only examples. You could also def
     "setUrl": "http://localhost/api/setColorTemperature?temperature=%s",
     "statusUrl": "http://localhost/api/getColorTemperature",
     "unit": "mired"
+  }
+}
+````
+
+#### Light bulb using body parameters
+````json
+{
+  "accessory": "HTTP-LIGHTBULB",
+  "name": "Light",
+  "debug": true,
+  "onUrl": {
+    "url": "http://localhost/api/light",
+    "method": "PUT",
+    "body": "{ \"on\": 1 }"
+  },
+  "offUrl": {
+    "url": "http://localhost/api/light",
+    "method": "PUT",
+    "body": "{ \"on\": 0 }"
+  },
+  "statusUrl": "http://localhost/api/light",
+  "brightness": {
+    "statusUrl": "http://localhost/api/light",
+    "setUrl": {
+      "url": "http://localhost/api/light",
+      "method": "PUT",
+      "body": "{ \"brightness\": %s }"
+    }
+  },
+  "colorTemperature": {
+    "statusUrl": "http://localhost/api/light",
+    "unit": "mired",
+    "minValue": 143,
+    "maxValue": 344,
+    "setUrl": {
+      "url": "http://localhost/api/light",
+      "method": "PUT",
+      "body": "{\"temperature\": %s }"
+    }
   }
 }
 ````
