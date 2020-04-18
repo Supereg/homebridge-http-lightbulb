@@ -749,7 +749,12 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getHue: function (callback) {
-        if (!this.hueCache.shouldQuery() || this.colorMode === ColorMode.TEMPERATURE) {
+        if (this.colorMode === ColorMode.TEMPERATURE) {
+            callback(null, 0);
+            return;
+        }
+
+        if (!this.hueCache.shouldQuery()) {
             const value = this.homebridgeService.getCharacteristic(Characteristic.Hue).value;
             if (this.debug)
                 this.log(`getHue() returning cached value '${value}'${this.hueCache.isInfinite()? " (infinite cache)": ""}`);
@@ -823,7 +828,12 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getSaturation: function (callback) {
-        if (!this.saturationCache.shouldQuery() || this.colorMode === ColorMode.TEMPERATURE) {
+        if (this.colorMode === ColorMode.TEMPERATURE) {
+            callback(null, 0);
+            return;
+        }
+
+        if (!this.saturationCache.shouldQuery()) {
             const value = this.homebridgeService.getCharacteristic(Characteristic.Saturation).value;
             if (this.debug)
                 this.log(`getSaturation() returning cached value '${value}'${this.saturationCache.isInfinite()? " (infinite cache)": ""}`);
@@ -964,7 +974,7 @@ HTTP_LIGHTBULB.prototype = {
                 if (this.debug)
                     this.log(`setColorTemperature() Successfully set colorTemperature to ${colorTemperatureMired} Mired. Body: '${body}'`);
 
-                // when colorMode is set to TEMPERATURE the hue and saturation characteristics will return cached values
+                // when colorMode is set to TEMPERATURE the hue and saturation characteristics must return a value of zero
                 // basically the values we calculate in #_updateColorByColorTemperature
                 this.colorMode = ColorMode.TEMPERATURE;
                 callback();
