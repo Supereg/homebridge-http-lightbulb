@@ -40,6 +40,7 @@ const SaturationUnit = Object.freeze({
 const TemperatureUnit = Object.freeze({
     MICRORECIPROCAL_DEGREE: "mired",
     KELVIN: "kelvin",
+    PERCENT: "percent"
 });
 
 /*
@@ -500,6 +501,8 @@ HTTP_LIGHTBULB.prototype = {
 
                         if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
                             minValue = Math.floor(1000000 / minValue);
+                        if (this.colorTemperature.unit === TemperatureUnit.PERCENT)
+                            minValue = 0;
                         this.colorTemperature.minValue = minValue;
                     }
                     else
@@ -511,6 +514,8 @@ HTTP_LIGHTBULB.prototype = {
 
                         if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
                             maxValue = Math.floor(1000000 / maxValue);
+                        if (this.colorTemperature.unit === TemperatureUnit.PERCENT)
+                            maxValue = 100;
                         this.colorTemperature.maxValue = maxValue;
                     }
                     else
@@ -940,6 +945,8 @@ HTTP_LIGHTBULB.prototype = {
 
                 if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
                     colorTemperature = Math.round(1000000 / colorTemperature); // converting Kelvin to mired
+                if (this.colorTemperature.unit === TemperatureUnit.PERCENT)
+                    colorTemperature = Math.round(400 - (3.5 * colorTemperature)); // converting percent to mired
 
                 if (colorTemperature >= this.colorTemperature.minValue && colorTemperature <= this.colorTemperature.maxValue) {
                     if (this.debug)
@@ -960,6 +967,8 @@ HTTP_LIGHTBULB.prototype = {
         const colorTemperatureMired = colorTemperature;
         if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
             colorTemperature = Math.round(1000000 / colorTemperature); // converting mired to Kelvin
+        if (this.colorTemperature.unit === TemperatureUnit.PERCENT)
+            colorTemperature = Math.round((-2/7) * (colorTemperature - 400)); // converting percent to mired
 
         http.httpRequest(this.colorTemperature.setUrl, (error, response, body) => {
             if (error) {
@@ -1013,6 +1022,8 @@ HTTP_LIGHTBULB.prototype = {
             let colorTemperature = this.homebridgeService.getCharacteristic(Characteristic.ColorTemperature).value;
             if (this.colorTemperature.unit === TemperatureUnit.KELVIN)
                 colorTemperature = Math.round(1000000 / colorTemperature);
+            if (this.colorTemperature.unit === TemperatureUnit.PERCENT)
+                colorTemperature = Math.round(400 - (3.5 * colorTemperature)); // converting percent to mired
 
             args.push({searchValue: "%colorTemperature", replacer: `${colorTemperature}`});
         }
