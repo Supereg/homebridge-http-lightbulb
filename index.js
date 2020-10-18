@@ -694,7 +694,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 let brightness;
                 try {
-                    brightness = utils.extractValueFromPattern(this.brightness.statusPattern, body, this.brightness.patternGroupToExtract);
+                    brightness = parseInt(utils.extractValueFromPattern(this.brightness.statusPattern, body, this.brightness.patternGroupToExtract));
                 } catch (error) {
                     this.log("getBrightness() error occurred while extracting brightness from body: " + error.message);
                     callback(new Error("pattern error"));
@@ -778,7 +778,7 @@ HTTP_LIGHTBULB.prototype = {
 
                let hue;
                try {
-                   hue = utils.extractValueFromPattern(this.hue.statusPattern, body, this.hue.patternGroupToExtract);
+                   hue = parseFloat(utils.extractValueFromPattern(this.hue.statusPattern, body, this.hue.patternGroupToExtract));
                } catch (error) {
                    this.log("getHue() error occurred while extracting hue from body: " + error.message);
                    callback(new Error("pattern error"));
@@ -857,7 +857,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 let saturation;
                 try {
-                    saturation = utils.extractValueFromPattern(this.saturation.statusPattern, body, this.saturation.patternGroupToExtract);
+                    saturation = parseFloat(utils.extractValueFromPattern(this.saturation.statusPattern, body, this.saturation.patternGroupToExtract));
                 } catch (error) {
                     this.log("getSaturation() error occurred while extracting saturation from body: " + error.message);
                     callback(new Error("pattern error"));
@@ -931,7 +931,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 let colorTemperature;
                 try {
-                    colorTemperature = utils.extractValueFromPattern(this.colorTemperature.statusPattern, body, this.colorTemperature.patternGroupToExtract);
+                    colorTemperature = parseInt(utils.extractValueFromPattern(this.colorTemperature.statusPattern, body, this.colorTemperature.patternGroupToExtract));
                 } catch (error) {
                     this.log("getColorTemperature() error occurred while extracting colorTemperature from body: " + error.message);
                     callback(new Error("pattern error"));
