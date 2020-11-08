@@ -61,6 +61,8 @@ function HTTP_LIGHTBULB(log, config) {
 
     this.colorMode = ColorMode.UNDEFINED;
 
+    this.ambientLightningSupport = this.checkAmbientLightningSupport();
+
     const success = this.parseCharacteristics(config);
     if (!success) {
         this.log.warn("Aborting...");
@@ -135,6 +137,10 @@ function HTTP_LIGHTBULB(log, config) {
                 maxValue: this.colorTemperature.maxValue
             });
 
+    if (this.brightness && this.colorTemperature) {
+        this.ambientLightningController = new api.hap.AmbientLightningController(homebridgeService);
+    }
+
     /** @namespace config.mqtt */
     if (config.mqtt) {
         let options;
@@ -182,7 +188,7 @@ function HTTP_LIGHTBULB(log, config) {
     /** @namespace config.pullInterval */
     if (config.pullInterval) {
         // TODO what is with updating other characteristics. 'On' should be enough for now, since this is probably the characteristic
-        //  that matters the most and also get's changed the most.
+        //  that matters the most and also gets changed the most.
         this.pullTimer = new PullTimer(this.log, config.pullInterval, this.getPowerState.bind(this), value => {
             this.homebridgeService.getCharacteristic(Characteristic.On).updateValue(value);
         });
@@ -251,6 +257,18 @@ HTTP_LIGHTBULB.prototype = {
             .setCharacteristic(Characteristic.FirmwareRevision, packageJSON.version);
 
         return [informationService, this.homebridgeService];
+    },
+
+    getControllers: function () {
+      if (!this.ambientLightningController) {
+          return [];
+      } else {
+          return [this.ambientLightningController];
+      }
+    },
+
+    checkAmbientLightningSupport: function () {
+        return api.version >= 2.7 && api.versionGreaterOrEqual("1.3.0-beta.19");
     },
 
     parseCharacteristics: function (config) {
@@ -609,12 +627,10 @@ HTTP_LIGHTBULB.prototype = {
             if (error) {
                 this.log("getPowerState() failed: %s", error.message);
                 callback(error);
-            }
-            else if (!http.isHttpSuccessCode(response.statusCode)) {
+            } else if (!http.isHttpSuccessCode(response.statusCode)) {
                 this.log(`getPowerState() http request returned http error code ${response.statusCode}: ${body}`);
                 callback(new Error("Got html error code " + response.statusCode));
-            }
-            else {
+            } else {
                 if (this.debug)
                     this.log(`getPowerState() request returned successfully (${response.statusCode}). Body: '${body}'`);
 
@@ -645,12 +661,10 @@ HTTP_LIGHTBULB.prototype = {
                 if (error) {
                     this.log("setPowerState() failed: %s", error.message);
                     callback(error);
-                }
-                else if (!http.isHttpSuccessCode(response.statusCode)) {
+                } else if (!http.isHttpSuccessCode(response.statusCode)) {
                     this.log(`setPowerState() http request returned http error code ${response.statusCode}: ${body}`);
                     callback(new Error("Got html error code " + response.statusCode));
-                }
-                else {
+                } else {
                     if (this.debug)
                         this.log(`setPowerState() Successfully set power to ${on? "ON": "OFF"}. Body: '${body}'`);
 
@@ -683,12 +697,10 @@ HTTP_LIGHTBULB.prototype = {
             if (error) {
                 this.log("getBrightness() failed: %s", error.message);
                 callback(error);
-            }
-            else if (!http.isHttpSuccessCode(response.statusCode)) {
+            } else if (!http.isHttpSuccessCode(response.statusCode)) {
                 this.log(`getBrightness() http request returned http error code ${response.statusCode}: ${body}`);
                 callback(new Error("Got html error code " + response.statusCode));
-            }
-            else {
+            } else {
                 if (this.debug)
                     this.log(`getBrightness() request returned successfully (${response.statusCode}). Body: '${body}'`);
 
@@ -710,8 +722,7 @@ HTTP_LIGHTBULB.prototype = {
 
                     this.brightnessCache.queried();
                     callback(null, brightness);
-                }
-                else {
+                } else {
                     this.log("getBrightness() brightness is not in range of 0-100 % (actual: %s)", brightness);
                     callback(new Error("invalid range"));
                 }
@@ -733,12 +744,10 @@ HTTP_LIGHTBULB.prototype = {
                     if (error) {
                         this.log("setBrightness() failed: %s", error.message);
                         callback(error);
-                    }
-                    else if (!http.isHttpSuccessCode(response.statusCode)) {
+                    } else if (!http.isHttpSuccessCode(response.statusCode)) {
                         this.log(`setBrightness() http request returned http error code ${response.statusCode}: ${body}`);
                         callback(new Error("Got html error code " + response.statusCode));
-                    }
-                    else {
+                    } else {
                         if (this.debug)
                             this.log(`setBrightness() Successfully set brightness to ${brightnessPercentage}%. Body: '${body}'`);
 
@@ -750,7 +759,8 @@ HTTP_LIGHTBULB.prototype = {
 
     getHue: function (callback) {
         if (this.colorMode === ColorMode.TEMPERATURE) {
-            callback(null, 0);
+            // use the value calculated in _updateColorByColorTemperature
+            callback(null, this.homebridgeService.getCharacteristic(Characteristic.Hue).value);
             return;
         }
 
@@ -767,12 +777,10 @@ HTTP_LIGHTBULB.prototype = {
            if (error) {
                this.log("getHue() failed: %s", error.message);
                callback(error);
-           }
-           else if (!http.isHttpSuccessCode(response.statusCode)) {
+           } else if (!http.isHttpSuccessCode(response.statusCode)) {
                this.log(`getHue() http request returned http error code ${response.statusCode}: ${body}`);
                callback(new Error("Got html error code " + response.statusCode));
-           }
-           else {
+           } else {
                if (this.debug)
                    this.log(`getHue() request returned successfully (${response.statusCode}). Body '${body}'`);
 
@@ -794,8 +802,7 @@ HTTP_LIGHTBULB.prototype = {
 
                    this.hueCache.queried();
                    callback(null, hue);
-               }
-               else {
+               } else {
                    this.log("getHue() hue is not in range of 0-360 (actual: %s)", hue);
                    callback(new Error("invalid range"));
                }
@@ -812,12 +819,10 @@ HTTP_LIGHTBULB.prototype = {
             if (error) {
                 this.log("setHue() failed: %s", error.message);
                 callback(error);
-            }
-            else if (!http.isHttpSuccessCode(response.statusCode)) {
+            } else if (!http.isHttpSuccessCode(response.statusCode)) {
                 this.log(`setHue() http request returned http error code ${response.statusCode}: ${body}`);
                 callback(new Error("Got html error code " + response.statusCode));
-            }
-            else {
+            } else {
                 if (this.debug)
                     this.log(`setHue() Successfully set hue to ${hueHSV}. Body: '${body}'`);
 
@@ -829,7 +834,8 @@ HTTP_LIGHTBULB.prototype = {
 
     getSaturation: function (callback) {
         if (this.colorMode === ColorMode.TEMPERATURE) {
-            callback(null, 0);
+            // use the value calculated in _updateColorByColorTemperature
+            callback(null, this.homebridgeService.getCharacteristic(Characteristic.Saturation).value);
             return;
         }
 
@@ -846,12 +852,10 @@ HTTP_LIGHTBULB.prototype = {
             if (error) {
                 this.log("getSaturation() failed: %s", error.message);
                 callback(error);
-            }
-            else if (!http.isHttpSuccessCode(response.statusCode)) {
+            } else if (!http.isHttpSuccessCode(response.statusCode)) {
                 this.log(`getSaturation() http request returned http error code ${response.statusCode}: ${body}`);
                 callback(new Error("Got html error code " + response.statusCode));
-            }
-            else {
+            } else {
                 if (this.debug)
                     this.log(`getSaturation() request returned successfully (${response.statusCode}). Body '${body}'`);
 
@@ -916,16 +920,19 @@ HTTP_LIGHTBULB.prototype = {
             return;
         }
 
+        if (this.colorMode !== ColorMode.TEMPERATURE) {
+            callback(null, this.colorTemperature.minValue);
+            return;
+        }
+
         http.httpRequest(this.colorTemperature.statusUrl, (error, response, body) => {
             if (error) {
                 this.log("getColorTemperature() failed: %s", error.message);
                 callback(error);
-            }
-            else if (!http.isHttpSuccessCode(response.statusCode)) {
+            } else if (!http.isHttpSuccessCode(response.statusCode)) {
                 this.log(`getColorTemperature() http request returned http error code ${response.statusCode}: ${body}`);
                 callback(new Error("Got html error code " + response.statusCode));
-            }
-            else {
+            } else {
                 if (this.debug)
                     this.log(`getColorTemperature() request returned successfully (${response.statusCode}). Body '${body}'`);
 
@@ -947,8 +954,7 @@ HTTP_LIGHTBULB.prototype = {
 
                     this.colorTemperatureCache.queried();
                     callback(null, colorTemperature);
-                }
-                else {
+                } else {
                     this.log("getColorTemperature() colorTemperature is not in range of 0-100 (actual: %s)", colorTemperature);
                     callback(new Error("invalid range"));
                 }
@@ -965,17 +971,15 @@ HTTP_LIGHTBULB.prototype = {
             if (error) {
                 this.log("setColorTemperature() failed: %s", error.message);
                 callback(error);
-            }
-            else if (!http.isHttpSuccessCode(response.statusCode)) {
+            } else if (!http.isHttpSuccessCode(response.statusCode)) {
                 this.log(`setColorTemperature() http request returned http error code ${response.statusCode}: ${body}`);
                 callback(new Error("Got html error code " + response.statusCode));
-            }
-            else {
+            } else {
                 if (this.debug)
                     this.log(`setColorTemperature() Successfully set colorTemperature to ${colorTemperatureMired} Mired. Body: '${body}'`);
 
-                // when colorMode is set to TEMPERATURE the hue and saturation characteristics must return a value of zero
-                // basically the values we calculate in #_updateColorByColorTemperature
+                // when colorMode is set to TEMPERATURE the hue and saturation characteristics must return
+                // the color temperature represented as hue and saturation values
                 this.colorMode = ColorMode.TEMPERATURE;
                 callback();
 
@@ -1024,13 +1028,24 @@ HTTP_LIGHTBULB.prototype = {
         if (!this.hue && !this.saturation)
             return;
 
-        const rgbObject = this._temperatureToRGB(colorTemperature);
-        const hsvObject = this._RGBtoHSV(rgbObject.red, rgbObject.green, rgbObject.blue);
+        let hue;
+        let saturation;
+
+        if (this.ambientLightningSupport) {
+            const color = api.hap.ColorUtils.colorTemperatureToHueAndSaturation(colorTemperature);
+            hue = color.hue;
+            saturation = color.saturation;
+        } else { // this algorithm is actually completely broken
+            const rgbObject = this._temperatureToRGB(colorTemperature);
+            const hsvObject = this._RGBtoHSV(rgbObject.red, rgbObject.green, rgbObject.blue);
+            hue = hsvObject.hue;
+            saturation = hsvObject.saturation;
+        }
 
         if (this.hue)
-            this.homebridgeService.getCharacteristic(Characteristic.Hue).updateValue(hsvObject.hue);
+            this.homebridgeService.getCharacteristic(Characteristic.Hue).updateValue(hue);
         if (this.saturation)
-            this.homebridgeService.getCharacteristic(Characteristic.Saturation).updateValue(hsvObject.saturation);
+            this.homebridgeService.getCharacteristic(Characteristic.Saturation).updateValue(saturation);
     },
 
     _temperatureToRGB(temperature) {
