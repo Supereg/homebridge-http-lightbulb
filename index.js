@@ -61,7 +61,7 @@ function HTTP_LIGHTBULB(log, config) {
 
     this.colorMode = ColorMode.UNDEFINED;
 
-    this.ambientLightningSupport = this.checkAmbientLightningSupport();
+    this.adaptiveLightingSupport = this.checkAdaptiveLightingSupport();
 
     const success = this.parseCharacteristics(config);
     if (!success) {
@@ -138,7 +138,7 @@ function HTTP_LIGHTBULB(log, config) {
             });
 
     if (this.brightness && this.colorTemperature) {
-        this.ambientLightningController = new api.hap.AmbientLightningController(homebridgeService);
+        this.adaptiveLightingController = new api.hap.AdaptiveLightingController(homebridgeService);
     }
 
     /** @namespace config.mqtt */
@@ -260,14 +260,14 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     getControllers: function () {
-      if (!this.ambientLightningController) {
+      if (!this.adaptiveLightingController) {
           return [];
       } else {
-          return [this.ambientLightningController];
+          return [this.adaptiveLightingController];
       }
     },
 
-    checkAmbientLightningSupport: function () {
+    checkAdaptiveLightingSupport: function () {
         return api.version >= 2.7 && api.versionGreaterOrEqual("1.3.0-beta.19");
     },
 
@@ -1031,7 +1031,7 @@ HTTP_LIGHTBULB.prototype = {
         let hue;
         let saturation;
 
-        if (this.ambientLightningSupport) {
+        if (this.adaptiveLightingSupport) {
             const color = api.hap.ColorUtils.colorTemperatureToHueAndSaturation(colorTemperature);
             hue = color.hue;
             saturation = color.saturation;
