@@ -348,7 +348,7 @@ HTTP_LIGHTBULB.prototype = {
 
                 this.brightness.statusPattern = /([0-9]{1,3})/; // default pattern
                 try {
-                    if (this.brightness.statusPattern)
+                    if (config.brightness.statusPattern)
                         this.brightness.statusPattern = configParser.parsePattern(config.brightness.statusPattern);
                 } catch (error) {
                     this.log.warn("Property 'brightness.statusPattern' was given in an unsupported type. Using the default one!");
