@@ -137,7 +137,7 @@ function HTTP_LIGHTBULB(log, config) {
                 maxValue: this.colorTemperature.maxValue
             });
 
-    if (this.brightness && this.colorTemperature) {
+    if (this.adaptiveLightingSupport && this.brightness && this.colorTemperature) {
         this.adaptiveLightingController = new api.hap.AdaptiveLightingController(homebridgeService);
     }
 
@@ -268,7 +268,8 @@ HTTP_LIGHTBULB.prototype = {
     },
 
     checkAdaptiveLightingSupport: function () {
-        return api.version >= 2.7 && api.versionGreaterOrEqual("1.3.0-beta.19");
+        return api.version >= 2.7 && api.versionGreaterOrEqual("1.3.0-beta.19")
+            || !!api.hap.AdaptiveLightingController; // support check on Hoobs
     },
 
     parseCharacteristics: function (config) {
