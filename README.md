@@ -156,10 +156,11 @@ The configuration can contain the following properties:
         are available:
         * **"mired"**: Using mired (more specifically _microreciprocal degree_) to calculate color temperature
         * **"kelvin"**: Using Kelvin to calculate color temperature
+        * **"percent"**: Using percent to calculate color temperature
     * `minValue` \<number\> **optional** \(Default: **50**\): Defines the minimum supported temperature in the 
-        given `unit`. The defaut is **50** mired or **20.000** Kelvin.
+        given `unit`. The default is **50** mired or **20.000** Kelvin. If unit is defined as percent, `minValue` must be defined in mired. 100% maps to `minValue` (**50** mired by default).
     * `maxValue` \<number\> **optional** \(Default: **400**\): Defines the maximum supported temperature in the 
-        given `unit`. The fault is **400** mired or **2.500** Kelvin.
+        given `unit`. The default is **400** mired or **2.500** Kelvin. If unit is defined as percent, `minValue` must be defined in mired. 0% maps to `maxValue` (**400** mired by default).
     * `statusPattern` \<string\> **optional** \(Default: **"([0-9]{2,3})"** \[**"([0-9]{4,5})"** when using Kelvin\]): Defines a regex pattern with which the 
         color temperature is extracted from the body of the http response from the `colorTemperature.statusUrl`. 
         The group which should be extracted can be configured with the `colorTemperature.patternGroupToExtract` property.
